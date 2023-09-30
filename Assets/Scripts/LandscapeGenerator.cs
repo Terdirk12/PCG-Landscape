@@ -8,7 +8,17 @@ public class LandscapeGenerator : MonoBehaviour
     public int xSize, zSize;
     private Vector3[] vertices;
     private Mesh mesh;
-    public float scale = 5f;
+    public int octaves = 6;
+    public float lacunarity = 2.0f, persistence = 0.5f, scale = 5.0f, exponent = 2.0f;
+    /*
+     * xSize and zSize control the grid size.
+     * octaves controls the number of layers to create the multifractal noise. more octaves is more complex terrain.
+     * lacunarity controls the scaling between octaves. more lacunarity is more fine detail in the terrain.
+     * persistance controls the amplutide of the scaling between octaves. lower = smoother, higher is rougher terrain.
+     * scale controls the overal size and height of the terrain. more is more terrain.
+     * exponent controls the shape of the mountain, higher = sharper and more defined peaks.
+     */
+
     private void Awake()
     {
         StartCoroutine(Generate());
@@ -38,7 +48,7 @@ public class LandscapeGenerator : MonoBehaviour
                 float zCoord = (float)z / zSize * scale;
 
                 // Use Perlin noise to generate the mountain height
-                float mountainHeight = Mathf.PerlinNoise(xCoord, zCoord) * scale;
+                float mountainHeight = CalculateMultifractalNoise(xCoord, zCoord);
 
                 vertices[i] = new Vector3(x, mountainHeight, z);
                 uv[i] = new Vector2((float)x / xSize, (float)z / zSize);
@@ -63,6 +73,21 @@ public class LandscapeGenerator : MonoBehaviour
                 yield return wait;
             }
         }
+    }
+    private float CalculateMultifractalNoise(float x, float z)
+    {
+        float noise = 0;
+        float frequency = 1;
+        float amplitude = 1;
+
+        for (int i = 0; i < octaves; i++)
+        {
+            noise += Mathf.PerlinNoise(x * frequency, z * frequency) * amplitude;
+            frequency *= lacunarity;
+            amplitude *= persistence;
+        }
+
+        return Mathf.Pow(noise, exponent) * scale;
     }
 
     private void OnDrawGizmos()
