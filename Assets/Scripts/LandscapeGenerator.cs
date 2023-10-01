@@ -9,9 +9,21 @@ public class LandscapeGenerator : MonoBehaviour
     private Vector3[] vertices;
     private Mesh mesh;
     public float baseHeight;
+    public Gradient gradient;
 
-    //public int mountainOctaves = 6;
-    //public float mountainLacunarity = 2.0f, mountainPersistence = 0.5f, mountainScale = 5.0f, mountainExponent = 2.0f, plainsScale, plainsHeight, plainsAmplitude;
+    public enum BiomeType
+    {
+        Plains,
+        Forest,
+        Mountains
+    }
+
+    private BiomeType[,] biomeMap; // Define a 2D biome map
+
+    public float mountainScale = 15.0f, plainsScale = 2f;
+    public float noiseScale = 0.1f, persistence = 0.5f, lacunarity = 2.0f; // Adjust this to control the noise scale
+    public int octaves = 5; // Number of octaves in the fractal noise
+
     /*
      * xSize and zSize control the grid size.
      * 
@@ -21,20 +33,74 @@ public class LandscapeGenerator : MonoBehaviour
      * mountainScale controls the overal size and height of the terrain. more is more terrain.
      * mountainExponent controls the shape of the mountain, higher = sharper and more defined peaks.
      * 
-     * plainsScale controls the scaling factor for the Perlin noise used to generate plains. higher = smoother, lower = more detailed
-     * plainsHeight controls the base height of the plains. starting elevation point
-     * plainsAmplitude controls the amplitude of the Perlin noise for plains. hight variation in the plains. lower = flatter plains.
-
      */
 
     private void Awake()
     {
-        StartCoroutine(GenerateMountainous());
+        InitializeBiomeMap(); // Initialize the biome map
+        StartCoroutine(GenerateTerrain());
     }
 
-    private IEnumerator GenerateMountainous()
+    private void InitializeBiomeMap()
     {
-        WaitForSeconds wait = new WaitForSeconds(0.0005f);
+        biomeMap = new BiomeType[xSize + 1, zSize + 1];
+        // Initialize the entire biome map as Plains by default
+        for (int x = 0; x <= xSize; x++)
+        {
+            for (int z = 0; z <= zSize; z++)
+            {
+                biomeMap[x, z] = BiomeType.Plains;
+            }
+        }
+
+        int numMountainRegions = Random.Range(5, 10); // Adjust the number of mountain regions
+        for (int i = 0; i < numMountainRegions; i++)
+        {
+            int startX = Random.Range(0, xSize);
+            int startZ = Random.Range(0, zSize);
+            int radius = Random.Range(10, 20); // Adjust the maximum radius
+
+            SetCircularBiomeRegion(startX, startZ, radius, BiomeType.Mountains);
+        }
+    }
+
+    private void SetBiomeRegion(int startX, int startZ, int width, int height, BiomeType biomeType)
+    {
+        for (int x = startX; x < startX + width; x++)
+        {
+            for (int z = startZ; z < startZ + height; z++)
+            {
+                if (x >= 0 && x <= xSize && z >= 0 && z <= zSize)
+                {
+                    biomeMap[x, z] = biomeType;
+                }
+            }
+        }
+    }
+
+    private void SetCircularBiomeRegion(int centerX, int centerZ, int radius, BiomeType biomeType)
+    {
+        for (int x = 0; x <= xSize; x++)
+        {
+            for (int z = 0; z <= zSize; z++)
+            {
+                int dx = x - centerX;
+                int dz = z - centerZ;
+                if (dx * dx + dz * dz <= radius * radius)
+                {
+                    // Check if the point is inside the circular region
+                    if (x >= 0 && x <= xSize && z >= 0 && z <= zSize)
+                    {
+                        biomeMap[x, z] = biomeType;
+                    }
+                }
+            }
+        }
+    }
+
+    private IEnumerator GenerateTerrain()
+    {
+        WaitForSeconds wait = new WaitForSeconds(0.00005f);
 
         GetComponent<MeshFilter>().mesh = mesh = new Mesh();
         mesh.name = "Procedural Grid";
@@ -44,19 +110,37 @@ public class LandscapeGenerator : MonoBehaviour
         Vector4[] tangents = new Vector4[vertices.Length];
         Vector4 tangent = new Vector4(1f, 0f, 0f, -1f);
 
-        // Modify the vertices to create a mountain using Perlin noise
-        // Adjust this scaling factor to control mountain height
-
-
+        // Generate terrain based on the biome
+        float height = 0f;
         for (int i = 0, z = 0; z <= zSize; z++)
         {
             for (int x = 0; x <= xSize; x++, i++)
             {
-                vertices[i] = new Vector3(x, baseHeight, z);
+                // Get the biome type for this point
+                BiomeType biome = biomeMap[x, z];
+
+                switch (biome)
+                {
+                    case BiomeType.Plains:
+                        // Generate Plains terrain (you can define this function)
+                        height = GeneratePlainsTerrain(x, z);
+                        break;
+                    case BiomeType.Forest:
+                        // Generate Forest terrain
+                        height = GenerateForestTerrain(x, z);
+                        break;
+                    case BiomeType.Mountains:
+                        // Generate Mountainous terrain
+                        height = GenerateMountainousTerrain(x, z);
+                        break;
+                }
+
+                vertices[i] = new Vector3(x, height, z);
                 uv[i] = new Vector2((float)x / xSize, (float)z / zSize);
-                tangents[i] = tangent;
+                tangents[i] = tangent; 
             }
         }
+
         mesh.vertices = vertices;
         mesh.uv = uv;
         mesh.tangents = tangents;
@@ -75,25 +159,77 @@ public class LandscapeGenerator : MonoBehaviour
                 yield return wait;
             }
         }
+        StartCoroutine(ColorTerrain()); // Color the terrain after it has been generated.
     }
 
-    /*
-
-    private float CalculateMultifractalNoise(float x, float z)
+    private float GeneratePlainsTerrain(int x, int z)
     {
-        float noise = 0;
-        float frequency = 1;
-        float amplitude = 1;
+        // Scale the coordinates to control the feature size
+        float xCoord = (float)x / xSize * plainsScale;
+        float zCoord = (float)z / zSize * plainsScale;
 
-        for (int i = 0; i < mountainOctaves; i++)
+        // Use Perlin noise to generate terrain
+        float plainsHeight = Mathf.PerlinNoise(xCoord, zCoord);
+
+        // Apply scaling and offset to the height
+        plainsHeight *= plainsScale;
+        plainsHeight += baseHeight;
+
+        return plainsHeight;
+    }
+
+    private float GenerateForestTerrain(int x, int z)
+    {
+        // Define your Forest terrain generation logic here
+        // Example: Randomize tree placement, add variation in elevation, etc.
+        return baseHeight;
+    }
+
+    private float GenerateMountainousTerrain(int x, int z)
+    {
+        // Calculate the position in the noise field
+        float sampleX = (float)x / xSize * noiseScale;
+        float sampleZ = (float)z / zSize * noiseScale;
+
+        float height = 0;
+        float amplitude = 1;
+        float frequency = 1;
+
+        for (int i = 0; i < octaves; i++)
         {
-            noise += Mathf.PerlinNoise(x * frequency, z * frequency) * amplitude;
-            frequency *= mountainLacunarity;
-            amplitude *= mountainPersistence;
+            float perlinValue = Mathf.PerlinNoise(sampleX * frequency, sampleZ * frequency);
+            // Apply a power function to accentuate the peaks
+            height += Mathf.Pow(perlinValue, 3) * amplitude;
+            amplitude *= persistence;
+            frequency *= lacunarity;
         }
 
-        return Mathf.Pow(noise, mountainExponent) * mountainScale;
-    }*/
+        return height * mountainScale;
+    }
+
+    private IEnumerator ColorTerrain()
+    {
+        Color[] colors = new Color[vertices.Length];
+
+        float highestHeight = float.MinValue; // Initialize with a very low value
+
+        for (int i = 0; i < vertices.Length; i++)
+        {
+            if (vertices[i].y > highestHeight)
+            {
+                highestHeight = vertices[i].y;
+            }
+        }
+
+        for (int i = 0; i < vertices.Length; i++)
+        {
+            float colorHeight = Mathf.InverseLerp(0, highestHeight, vertices[i].y);
+            colors[i] = gradient.Evaluate(colorHeight);
+        }
+
+        mesh.colors = colors;
+        yield return new WaitForSeconds(0.0005f);
+    }
 
     private void OnDrawGizmos()
     {
