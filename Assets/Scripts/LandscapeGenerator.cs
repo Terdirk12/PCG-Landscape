@@ -8,23 +8,31 @@ public class LandscapeGenerator : MonoBehaviour
     public int xSize, zSize;
     private Vector3[] vertices;
     private Mesh mesh;
-    public int octaves = 6;
-    public float lacunarity = 2.0f, persistence = 0.5f, scale = 5.0f, exponent = 2.0f;
+    public float baseHeight;
+
+    //public int mountainOctaves = 6;
+    //public float mountainLacunarity = 2.0f, mountainPersistence = 0.5f, mountainScale = 5.0f, mountainExponent = 2.0f, plainsScale, plainsHeight, plainsAmplitude;
     /*
      * xSize and zSize control the grid size.
-     * octaves controls the number of layers to create the multifractal noise. more octaves is more complex terrain.
-     * lacunarity controls the scaling between octaves. more lacunarity is more fine detail in the terrain.
-     * persistance controls the amplutide of the scaling between octaves. lower = smoother, higher is rougher terrain.
-     * scale controls the overal size and height of the terrain. more is more terrain.
-     * exponent controls the shape of the mountain, higher = sharper and more defined peaks.
+     * 
+     * mountainOctaves controls the number of layers to create the multifractal noise. more octaves is more complex terrain.
+     * mountainLacunarity controls the scaling between octaves. more lacunarity is more fine detail in the terrain.
+     * mountainPersistence controls the amplutide of the scaling between octaves. lower = smoother, higher is rougher terrain.
+     * mountainScale controls the overal size and height of the terrain. more is more terrain.
+     * mountainExponent controls the shape of the mountain, higher = sharper and more defined peaks.
+     * 
+     * plainsScale controls the scaling factor for the Perlin noise used to generate plains. higher = smoother, lower = more detailed
+     * plainsHeight controls the base height of the plains. starting elevation point
+     * plainsAmplitude controls the amplitude of the Perlin noise for plains. hight variation in the plains. lower = flatter plains.
+
      */
 
     private void Awake()
     {
-        StartCoroutine(Generate());
+        StartCoroutine(GenerateMountainous());
     }
 
-    private IEnumerator Generate()
+    private IEnumerator GenerateMountainous()
     {
         WaitForSeconds wait = new WaitForSeconds(0.0005f);
 
@@ -44,13 +52,7 @@ public class LandscapeGenerator : MonoBehaviour
         {
             for (int x = 0; x <= xSize; x++, i++)
             {
-                float xCoord = (float)x / xSize * scale;
-                float zCoord = (float)z / zSize * scale;
-
-                // Use Perlin noise to generate the mountain height
-                float mountainHeight = CalculateMultifractalNoise(xCoord, zCoord);
-
-                vertices[i] = new Vector3(x, mountainHeight, z);
+                vertices[i] = new Vector3(x, baseHeight, z);
                 uv[i] = new Vector2((float)x / xSize, (float)z / zSize);
                 tangents[i] = tangent;
             }
@@ -74,21 +76,24 @@ public class LandscapeGenerator : MonoBehaviour
             }
         }
     }
+
+    /*
+
     private float CalculateMultifractalNoise(float x, float z)
     {
         float noise = 0;
         float frequency = 1;
         float amplitude = 1;
 
-        for (int i = 0; i < octaves; i++)
+        for (int i = 0; i < mountainOctaves; i++)
         {
             noise += Mathf.PerlinNoise(x * frequency, z * frequency) * amplitude;
-            frequency *= lacunarity;
-            amplitude *= persistence;
+            frequency *= mountainLacunarity;
+            amplitude *= mountainPersistence;
         }
 
-        return Mathf.Pow(noise, exponent) * scale;
-    }
+        return Mathf.Pow(noise, mountainExponent) * mountainScale;
+    }*/
 
     private void OnDrawGizmos()
     {

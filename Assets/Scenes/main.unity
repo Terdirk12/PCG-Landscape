@@ -324,13 +324,16 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 30696f76b6ff72e498a9607c686c0943, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  xSize: 100
-  zSize: 100
-  octaves: 10
-  lacunarity: 5
-  persistence: 0.5
-  scale: 5
-  exponent: 5
+  xSize: 200
+  zSize: 200
+  mountainOctaves: 6
+  mountainLacunarity: 2
+  mountainPersistence: 0.5
+  mountainScale: 5
+  mountainExponent: 2
+  plainsScale: 10
+  plainsHeight: 5
+  plainsAmplitude: 1
 --- !u!23 &1470579244
 MeshRenderer:
   m_ObjectHideFlags: 0
