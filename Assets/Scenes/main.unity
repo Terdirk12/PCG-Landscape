@@ -360,10 +360,9 @@ MonoBehaviour:
   mountainScale: 5
   plainsScale: 2
   noiseScale: 0.2
-  persistence: 0.9
+  persistence: 0.75
   lacunarity: 4
   octaves: 10
-  offset: {x: 0, y: 0}
 --- !u!23 &1470579244
 MeshRenderer:
   m_ObjectHideFlags: 0

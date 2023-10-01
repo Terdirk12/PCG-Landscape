@@ -10,6 +10,7 @@ public class LandscapeGenerator : MonoBehaviour
     private Mesh mesh;
     public float baseHeight;
     public Gradient gradient;
+    private float plainsHeight;
 
     public enum BiomeType
     {
@@ -100,8 +101,6 @@ public class LandscapeGenerator : MonoBehaviour
 
     private IEnumerator GenerateTerrain()
     {
-        WaitForSeconds wait = new WaitForSeconds(0.00005f);
-
         GetComponent<MeshFilter>().mesh = mesh = new Mesh();
         mesh.name = "Procedural Grid";
 
@@ -137,7 +136,7 @@ public class LandscapeGenerator : MonoBehaviour
 
                 vertices[i] = new Vector3(x, height, z);
                 uv[i] = new Vector2((float)x / xSize, (float)z / zSize);
-                tangents[i] = tangent; 
+                tangents[i] = tangent;
             }
         }
 
@@ -156,10 +155,10 @@ public class LandscapeGenerator : MonoBehaviour
                 triangles[tri + 5] = ver + xSize + 2;
 
                 mesh.triangles = triangles;
-                yield return wait;
+                yield return new WaitForSeconds(0.00005f);
             }
         }
-        StartCoroutine(ColorTerrain()); // Color the terrain after it has been generated.
+        StartCoroutine(SmoothTerrainTransition()); // Color the terrain after it has been generated.
     }
 
     private float GeneratePlainsTerrain(int x, int z)
@@ -169,7 +168,7 @@ public class LandscapeGenerator : MonoBehaviour
         float zCoord = (float)z / zSize * plainsScale;
 
         // Use Perlin noise to generate terrain
-        float plainsHeight = Mathf.PerlinNoise(xCoord, zCoord);
+        plainsHeight = Mathf.PerlinNoise(xCoord, zCoord);
 
         // Apply scaling and offset to the height
         plainsHeight *= plainsScale;
@@ -205,6 +204,61 @@ public class LandscapeGenerator : MonoBehaviour
         }
 
         return height * mountainScale;
+    }
+
+    private IEnumerator SmoothTerrainTransition()
+    {
+        // Define a range for the transition between plains and mountains
+        float transitionRange = 10.0f; // Adjust as needed
+
+        for (int z = 0; z < zSize; z++)
+        {
+            for (int x = 0; x < xSize; x++)
+            {
+                int vertexIndex = z * xSize + x;
+                Vector3 vertexPosition = vertices[vertexIndex];
+                float vertexHeight = vertexPosition.y;
+
+                // Check the neighboring vertices within the transition range
+                float totalHeight = vertexHeight;
+                int neighborCount = 1;
+
+                for (int dz = -1; dz <= 1; dz++)
+                {
+                    for (int dx = -1; dx <= 1; dx++)
+                    {
+                        int neighborX = x + dx;
+                        int neighborZ = z + dz;
+
+                        // Ensure the neighbor is within bounds
+                        if (neighborX >= 0 && neighborX < xSize && neighborZ >= 0 && neighborZ < zSize)
+                        {
+                            int neighborIndex = neighborZ * xSize + neighborX;
+                            float neighborHeight = vertices[neighborIndex].y;
+
+                            // Check if the neighbor is within the transition range
+                            if (Mathf.Abs(neighborHeight - vertexHeight) <= transitionRange)
+                            {
+                                totalHeight += neighborHeight;
+                                neighborCount++;
+                            }
+                        }
+                    }
+                }
+
+                // Calculate the average height within the transition range
+                float averageHeight = totalHeight / neighborCount;
+
+                // Update the vertex height
+                vertices[vertexIndex] = new Vector3(vertexPosition.x, averageHeight, vertexPosition.z);
+            }
+        }
+
+        // Update the mesh with the smoothed heights
+        mesh.vertices = vertices;
+        mesh.RecalculateNormals();
+        StartCoroutine(ColorTerrain()); // Color the terrain after it has been generated.
+        yield return new WaitForSeconds(0.00005f);
     }
 
     private IEnumerator ColorTerrain()
