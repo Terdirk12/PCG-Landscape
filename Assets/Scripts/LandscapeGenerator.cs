@@ -155,7 +155,7 @@ public class LandscapeGenerator : MonoBehaviour
                 triangles[tri + 5] = ver + xSize + 2;
 
                 mesh.triangles = triangles;
-                yield return new WaitForSeconds(0.00005f);
+                yield return new WaitForSeconds(0.0000005f);
             }
         }
         StartCoroutine(SmoothTerrainTransition()); // Color the terrain after it has been generated.
@@ -209,7 +209,7 @@ public class LandscapeGenerator : MonoBehaviour
     private IEnumerator SmoothTerrainTransition()
     {
         // Define a range for the transition between plains and mountains
-        float transitionRange = 10.0f; // Adjust as needed
+        float transitionRange = 5.0f; // Adjust as needed
 
         for (int z = 0; z < zSize; z++)
         {
@@ -221,7 +221,7 @@ public class LandscapeGenerator : MonoBehaviour
 
                 // Check the neighboring vertices within the transition range
                 float totalHeight = vertexHeight;
-                int neighborCount = 1;
+                int neighborCount = 3;
 
                 for (int dz = -1; dz <= 1; dz++)
                 {
@@ -258,7 +258,7 @@ public class LandscapeGenerator : MonoBehaviour
         mesh.vertices = vertices;
         mesh.RecalculateNormals();
         StartCoroutine(ColorTerrain()); // Color the terrain after it has been generated.
-        yield return new WaitForSeconds(0.00005f);
+        yield return new WaitForSeconds(0.5f);
     }
 
     private IEnumerator ColorTerrain()
@@ -282,7 +282,7 @@ public class LandscapeGenerator : MonoBehaviour
         }
 
         mesh.colors = colors;
-        yield return new WaitForSeconds(0.0005f);
+        yield return new WaitForSeconds(0.5f);
     }
 
     private void OnDrawGizmos()

@@ -338,8 +338,8 @@ MonoBehaviour:
     key6: {r: 1, g: 1, b: 1, a: 0}
     key7: {r: 0, g: 0, b: 0, a: 0}
     ctime0: 0
-    ctime1: 328
-    ctime2: 655
+    ctime1: 353
+    ctime2: 952
     ctime3: 9445
     ctime4: 16577
     ctime5: 31418
@@ -360,8 +360,8 @@ MonoBehaviour:
   mountainScale: 5
   plainsScale: 2
   noiseScale: 0.2
-  persistence: 0.75
-  lacunarity: 4
+  persistence: 0.9
+  lacunarity: 8
   octaves: 10
 --- !u!23 &1470579244
 MeshRenderer:
