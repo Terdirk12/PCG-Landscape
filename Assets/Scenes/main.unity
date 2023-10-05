@@ -326,7 +326,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   xSize: 100
   zSize: 100
-  baseHeight: -1
+  baseHeight: 0
   gradient:
     serializedVersion: 2
     key0: {r: 0.06808472, g: 0.9622642, b: 0.90924215, a: 1}
@@ -357,10 +357,10 @@ MonoBehaviour:
     m_ColorSpace: -1
     m_NumColorKeys: 7
     m_NumAlphaKeys: 3
-  mountainScale: 5
-  plainsScale: 2
+  mountainScale: 10
+  plainsScale: 1
   noiseScale: 0.2
-  persistence: 0.9
+  persistence: 0.5
   lacunarity: 8
   octaves: 10
 --- !u!23 &1470579244

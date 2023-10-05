@@ -16,7 +16,8 @@ public class LandscapeGenerator : MonoBehaviour
     {
         Plains,
         Forest,
-        Mountains
+        Mountains,
+        Ocean
     }
 
     private BiomeType[,] biomeMap; // Define a 2D biome map
@@ -50,7 +51,7 @@ public class LandscapeGenerator : MonoBehaviour
         {
             for (int z = 0; z <= zSize; z++)
             {
-                biomeMap[x, z] = BiomeType.Plains;
+                biomeMap[x, z] = BiomeType.Ocean;
             }
         }
 
@@ -132,6 +133,10 @@ public class LandscapeGenerator : MonoBehaviour
                         // Generate Mountainous terrain
                         height = GenerateMountainousTerrain(x, z);
                         break;
+                    case BiomeType.Ocean:
+                        // Generate Mountainous terrain
+                        height = GenerateOceanTerrain(x, z);
+                        break;
                 }
 
                 vertices[i] = new Vector3(x, height, z);
@@ -179,9 +184,8 @@ public class LandscapeGenerator : MonoBehaviour
 
     private float GenerateForestTerrain(int x, int z)
     {
-        // Define your Forest terrain generation logic here
-        // Example: Randomize tree placement, add variation in elevation, etc.
-        return baseHeight;
+        int oceanHeight = -1;
+        return oceanHeight;
     }
 
     private float GenerateMountainousTerrain(int x, int z)
@@ -204,6 +208,13 @@ public class LandscapeGenerator : MonoBehaviour
         }
 
         return height * mountainScale;
+    }
+
+    private float GenerateOceanTerrain(int x, int z)
+    {
+        // Define your Forest terrain generation logic here
+        // Example: Randomize tree placement, add variation in elevation, etc.
+        return baseHeight;
     }
 
     private IEnumerator SmoothTerrainTransition()
