@@ -10,7 +10,8 @@ public class LandscapeGenerator : MonoBehaviour
     private Mesh mesh;
     public float baseHeight;
     public Gradient gradient;
-    private float plainsHeight;
+    public GameObject treePrefab; // Reference to your tree prefab
+    public float treeDensity = 0.3f; // Adjust the density of trees in the forest biome
 
     public enum BiomeType
     {
@@ -22,82 +23,67 @@ public class LandscapeGenerator : MonoBehaviour
 
     private BiomeType[,] biomeMap; // Define a 2D biome map
 
-    public float mountainScale = 15.0f, plainsScale = 2f;
-    public float noiseScale = 0.1f, persistence = 0.5f, lacunarity = 2.0f; // Adjust this to control the noise scale
-    public int octaves = 5; // Number of octaves in the fractal noise
-
-    /*
-     * xSize and zSize control the grid size.
-     * 
-     * mountainOctaves controls the number of layers to create the multifractal noise. more octaves is more complex terrain.
-     * mountainLacunarity controls the scaling between octaves. more lacunarity is more fine detail in the terrain.
-     * mountainPersistence controls the amplutide of the scaling between octaves. lower = smoother, higher is rougher terrain.
-     * mountainScale controls the overal size and height of the terrain. more is more terrain.
-     * mountainExponent controls the shape of the mountain, higher = sharper and more defined peaks.
-     * 
-     */
+    public float mountainScale = 15.0f, plainsScale = 2f, smoothingStrenght = 1f, transitionRange = 5.0f, persistence = 0.5f, lacunarity = 2.0f;
+    public int octaves = 5, neighbors = 3; // Number of octaves in the fractal noise                  
 
     private void Awake()
     {
-        InitializeBiomeMap(); // Initialize the biome map
-        StartCoroutine(GenerateTerrain());
+        InitializeBiomeMap(); // Initialize the biome map  
     }
 
     private void InitializeBiomeMap()
     {
         biomeMap = new BiomeType[xSize + 1, zSize + 1];
-        // Initialize the entire biome map as Plains by default
+        int xOffset = Random.Range(0, 10000);
+        int zOffset = Random.Range(0, 10000);
+
+        // Initialize the biome map using multiple Perlin noise layers
         for (int x = 0; x <= xSize; x++)
         {
             for (int z = 0; z <= zSize; z++)
             {
-                biomeMap[x, z] = BiomeType.Ocean;
-            }
-        }
 
-        int numMountainRegions = Random.Range(5, 10); // Adjust the number of mountain regions
-        for (int i = 0; i < numMountainRegions; i++)
-        {
-            int startX = Random.Range(0, xSize);
-            int startZ = Random.Range(0, zSize);
-            int radius = Random.Range(10, 20); // Adjust the maximum radius
 
-            SetCircularBiomeRegion(startX, startZ, radius, BiomeType.Mountains);
-        }
-    }
+                // Scale the coordinates for each biome type
+                float plainsXCoord = (float)x / xSize * plainsScale + xOffset;
+                float plainsZCoord = (float)z / zSize * plainsScale + zOffset;
 
-    private void SetBiomeRegion(int startX, int startZ, int width, int height, BiomeType biomeType)
-    {
-        for (int x = startX; x < startX + width; x++)
-        {
-            for (int z = startZ; z < startZ + height; z++)
-            {
-                if (x >= 0 && x <= xSize && z >= 0 && z <= zSize)
+                float forestXCoord = (float)x / xSize + xOffset;
+                float forestZCoord = (float)z / zSize + zOffset;
+
+                float mountainsXCoord = (float)x / xSize * mountainScale + xOffset;
+                float mountainsZCoord = (float)z / zSize * mountainScale + zOffset;
+
+
+                // Generate Perlin noise values for each biome type
+                float plainsNoise = Mathf.PerlinNoise(plainsXCoord, plainsZCoord);
+                float forestNoise = Mathf.PerlinNoise(forestXCoord, forestZCoord);
+                float mountainsNoise = Mathf.PerlinNoise(mountainsXCoord, mountainsZCoord);
+
+                // You can adjust these thresholds to determine the biome distribution
+                if (plainsNoise < 0.4f)
                 {
-                    biomeMap[x, z] = biomeType;
+                    biomeMap[x, z] = BiomeType.Ocean;
+                }
+                else if (plainsNoise < 0.6f)
+                {
+                    biomeMap[x, z] = BiomeType.Plains;
+                }
+                else if (forestNoise < 0.4f)
+                {
+                    biomeMap[x, z] = BiomeType.Forest;
+                }
+                else if (mountainsNoise < 0.5f)
+                {
+                    biomeMap[x, z] = BiomeType.Mountains;
+                }
+                else
+                {
+                    biomeMap[x, z] = BiomeType.Plains; // Default to Plains if none of the conditions match
                 }
             }
         }
-    }
-
-    private void SetCircularBiomeRegion(int centerX, int centerZ, int radius, BiomeType biomeType)
-    {
-        for (int x = 0; x <= xSize; x++)
-        {
-            for (int z = 0; z <= zSize; z++)
-            {
-                int dx = x - centerX;
-                int dz = z - centerZ;
-                if (dx * dx + dz * dz <= radius * radius)
-                {
-                    // Check if the point is inside the circular region
-                    if (x >= 0 && x <= xSize && z >= 0 && z <= zSize)
-                    {
-                        biomeMap[x, z] = biomeType;
-                    }
-                }
-            }
-        }
+        StartCoroutine(GenerateTerrain());
     }
 
     private IEnumerator GenerateTerrain()
@@ -160,10 +146,10 @@ public class LandscapeGenerator : MonoBehaviour
                 triangles[tri + 5] = ver + xSize + 2;
 
                 mesh.triangles = triangles;
-                yield return new WaitForSeconds(0.0000005f);
+                yield return new WaitForSeconds(0f);
             }
         }
-        StartCoroutine(SmoothTerrainTransition()); // Color the terrain after it has been generated.
+        SmoothTerrainTransition(); // Color the terrain after it has been generated.
     }
 
     private float GeneratePlainsTerrain(int x, int z)
@@ -173,26 +159,63 @@ public class LandscapeGenerator : MonoBehaviour
         float zCoord = (float)z / zSize * plainsScale;
 
         // Use Perlin noise to generate terrain
-        plainsHeight = Mathf.PerlinNoise(xCoord, zCoord);
+        float plainsHeight = Mathf.PerlinNoise(xCoord, zCoord);
 
         // Apply scaling and offset to the height
-        plainsHeight *= plainsScale;
         plainsHeight += baseHeight;
 
         return plainsHeight;
     }
 
+    private void GenerateTrees()
+    {
+        for (int z = 0; z <= zSize; z++)
+        {
+            for (int x = 0; x <= xSize; x++)
+            {
+                BiomeType biome = biomeMap[x, z];
+
+                if (biome == BiomeType.Forest)
+                {
+                    // Define the region for Poisson disc sampling within the forest biome
+                    Vector2 forestRegionSize = new Vector2(2, 2);
+
+                    // Generate Poisson disc samples for the forest biome at this specific point
+                    List<Vector2> treePositions = DiscSampling.GeneratePoints(biomeMap, 1, forestRegionSize, Mathf.FloorToInt(treeDensity * 30)); // Adjust the density
+
+                    // Iterate through the tree placement points and instantiate trees
+                    foreach (Vector2 position in treePositions)
+                    {
+                        // Get the grid coordinates within the terrain
+                        float treeX = position.x + x;
+                        float treeZ = position.y + z;
+
+                        // Make sure the grid coordinates are within bounds
+                        if (treeX >= 0 && treeX <= xSize && treeZ >= 0 && treeZ <= zSize)
+                        {
+                            // Use the height at the tree's grid position
+                            float treeHeight = vertices[Mathf.FloorToInt(treeZ) * (xSize + 1) + Mathf.FloorToInt(treeX)].y;
+
+                            // Instantiate the tree at the correct height
+                            Instantiate(treePrefab, new Vector3(treeX, treeHeight, treeZ), Quaternion.identity);
+                        }
+                    }
+                }
+            }
+        }
+    }
+
     private float GenerateForestTerrain(int x, int z)
     {
-        int oceanHeight = -1;
-        return oceanHeight;
+        float forestHeight = baseHeight + 1;
+        return forestHeight;
     }
 
     private float GenerateMountainousTerrain(int x, int z)
     {
         // Calculate the position in the noise field
-        float sampleX = (float)x / xSize * noiseScale;
-        float sampleZ = (float)z / zSize * noiseScale;
+        float sampleX = (float)x / xSize;
+        float sampleZ = (float)z / zSize;
 
         float height = 0;
         float amplitude = 1;
@@ -200,28 +223,30 @@ public class LandscapeGenerator : MonoBehaviour
 
         for (int i = 0; i < octaves; i++)
         {
-            float perlinValue = Mathf.PerlinNoise(sampleX * frequency, sampleZ * frequency);
-            // Apply a power function to accentuate the peaks
-            height += Mathf.Pow(perlinValue, 3) * amplitude;
             amplitude *= persistence;
             frequency *= lacunarity;
+
+            float noiseValue = Mathf.PerlinNoise(sampleX * frequency, sampleZ * frequency);
+
+            // Calculate ridged multifractal noise
+            float ridgeValue = Mathf.Abs(2 * Mathf.PerlinNoise(sampleX * frequency, sampleZ * frequency) - 1);
+
+            // Apply the ridgeValue to accentuate peaks
+            height += ridgeValue + noiseValue * amplitude;
+
         }
 
-        return height * mountainScale;
+        return height + 2;
     }
 
     private float GenerateOceanTerrain(int x, int z)
     {
-        // Define your Forest terrain generation logic here
-        // Example: Randomize tree placement, add variation in elevation, etc.
-        return baseHeight;
+        int oceanHeight = -1;
+        return oceanHeight;
     }
 
-    private IEnumerator SmoothTerrainTransition()
+    private void SmoothTerrainTransition()
     {
-        // Define a range for the transition between plains and mountains
-        float transitionRange = 5.0f; // Adjust as needed
-
         for (int z = 0; z < zSize; z++)
         {
             for (int x = 0; x < xSize; x++)
@@ -232,7 +257,7 @@ public class LandscapeGenerator : MonoBehaviour
 
                 // Check the neighboring vertices within the transition range
                 float totalHeight = vertexHeight;
-                int neighborCount = 3;
+                int neighborCount = neighbors;
 
                 for (int dz = -1; dz <= 1; dz++)
                 {
@@ -250,7 +275,7 @@ public class LandscapeGenerator : MonoBehaviour
                             // Check if the neighbor is within the transition range
                             if (Mathf.Abs(neighborHeight - vertexHeight) <= transitionRange)
                             {
-                                totalHeight += neighborHeight;
+                                totalHeight += neighborHeight * smoothingStrenght;
                                 neighborCount++;
                             }
                         }
@@ -268,11 +293,11 @@ public class LandscapeGenerator : MonoBehaviour
         // Update the mesh with the smoothed heights
         mesh.vertices = vertices;
         mesh.RecalculateNormals();
-        StartCoroutine(ColorTerrain()); // Color the terrain after it has been generated.
-        yield return new WaitForSeconds(0.5f);
+        ColorTerrain(); // Color the terrain after it has been generated.
+        GenerateTrees(); // Generate trees.
     }
 
-    private IEnumerator ColorTerrain()
+    private void ColorTerrain()
     {
         Color[] colors = new Color[vertices.Length];
 
@@ -293,7 +318,6 @@ public class LandscapeGenerator : MonoBehaviour
         }
 
         mesh.colors = colors;
-        yield return new WaitForSeconds(0.5f);
     }
 
     private void OnDrawGizmos()
@@ -306,7 +330,45 @@ public class LandscapeGenerator : MonoBehaviour
         Gizmos.color = Color.black;
         for (int i = 0; i < vertices.Length; i++)
         {
-            Gizmos.DrawSphere(vertices[i], 0.1f);
+            //Gizmos.DrawSphere(vertices[i], 0.1f);
+        }
+
+        if (biomeMap == null)
+        {
+            return;
+        }
+
+        Gizmos.color = Color.red;
+        float sphereSize = 0.1f;
+
+        for (int x = 0; x <= xSize; x++)
+        {
+            for (int z = 0; z <= zSize; z++)
+            {
+                Vector3 position = new Vector3(x, 0f, z);
+                BiomeType biome = biomeMap[x, z];
+
+                switch (biome)
+                {
+                    case BiomeType.Plains:
+                        Gizmos.color = Color.green;
+                        break;
+                    case BiomeType.Forest:
+                        Gizmos.color = Color.red;
+                        break;
+                    case BiomeType.Mountains:
+                        Gizmos.color = Color.gray;
+                        break;
+                    case BiomeType.Ocean:
+                        Gizmos.color = Color.blue;
+                        break;
+                    default:
+                        Gizmos.color = Color.white;
+                        break;
+                }
+
+                Gizmos.DrawSphere(position, sphereSize);
+            }
         }
     }
 }
