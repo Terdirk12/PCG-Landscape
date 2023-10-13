@@ -164,24 +164,38 @@ public class LandscapeGenerator : MonoBehaviour
 
     private void GenerateTrees()
     {
+        // Create an empty GameObject to serve as the container for the trees
+        GameObject treeContainer = new GameObject("TreeContainer");
+
         // Generate Poisson disc samples for the forest biome at this specific point
-        List<Vector2> treePositions = DiscSampling.GeneratePoints(biomeMap, givenRadius, new Vector2(xSize, zSize), Mathf.FloorToInt(treeDensity * 10)); // Adjust the density
+        List<Vector2> treePositions = DiscSampling.GeneratePoints(givenRadius, new Vector2(xSize, zSize), Mathf.FloorToInt(treeDensity * 10)); // Adjust the density
 
         // Iterate through the tree placement points and instantiate trees
         foreach (Vector2 position in treePositions)
         {
-            // Use the height at the tree's grid position
-            float treeHeight = vertices[Mathf.FloorToInt(position.y) * (xSize + 1) + Mathf.FloorToInt(position.x)].y;
-            if (treeHeight < 7)
+            // Get the biome type at the tree's grid position
+            BiomeType biome = biomeMap[Mathf.FloorToInt(position.x), Mathf.FloorToInt(position.y)];
+
+            if (biome == BiomeType.Forest)
             {
-                if (treeHeight > 5)
+                // Use the height at the tree's grid position
+                float treeHeight = vertices[Mathf.FloorToInt(position.y) * (xSize + 1) + Mathf.FloorToInt(position.x)].y;
+                if (treeHeight < 7)
                 {
-                    // Instantiate the tree at the correct height
-                    Instantiate(pinetreePrefab, new Vector3(position.x, treeHeight, position.y), Quaternion.identity);
-                }
-                else
-                {
-                    Instantiate(lushtreePrefab, new Vector3(position.x, treeHeight, position.y), Quaternion.identity);
+                    GameObject treeObject; // The instantiated tree object
+                    if (treeHeight > 5)
+                    {
+                        treeHeight += Random.Range(-0.05f, 0.05f);
+                        treeObject = Instantiate(pinetreePrefab, new Vector3(position.x, treeHeight, position.y), Quaternion.identity);
+                    }
+                    else
+                    {
+                        treeHeight += Random.Range(-0.05f, 0.05f);
+                        treeObject = Instantiate(lushtreePrefab, new Vector3(position.x, treeHeight, position.y), Quaternion.identity);
+                    }
+
+                    // Set the tree object as a child of the treeContainer
+                    treeObject.transform.parent = treeContainer.transform;
                 }
             }
         }
