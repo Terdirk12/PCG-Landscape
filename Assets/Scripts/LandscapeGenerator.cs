@@ -10,8 +10,8 @@ public class LandscapeGenerator : MonoBehaviour
     private Mesh mesh;
     public float baseHeight;
     public Gradient gradient;
-    public GameObject treePrefab; // Reference to your tree prefab
-    public float treeDensity = 0.3f; // Adjust the density of trees in the forest biome
+    public GameObject pinetreePrefab, lushtreePrefab; // Reference to your tree prefab
+    public float treeDensity = 0.3f, givenRadius = 0.5f; // Adjust the density of trees in the forest biome
 
     public enum BiomeType
     {
@@ -42,8 +42,6 @@ public class LandscapeGenerator : MonoBehaviour
         {
             for (int z = 0; z <= zSize; z++)
             {
-
-
                 // Scale the coordinates for each biome type
                 float plainsXCoord = (float)x / xSize * plainsScale + xOffset;
                 float plainsZCoord = (float)z / zSize * plainsScale + zOffset;
@@ -83,10 +81,10 @@ public class LandscapeGenerator : MonoBehaviour
                 }
             }
         }
-        StartCoroutine(GenerateTerrain());
+        GenerateTerrain();
     }
 
-    private IEnumerator GenerateTerrain()
+    private void GenerateTerrain()
     {
         GetComponent<MeshFilter>().mesh = mesh = new Mesh();
         mesh.name = "Procedural Grid";
@@ -146,7 +144,6 @@ public class LandscapeGenerator : MonoBehaviour
                 triangles[tri + 5] = ver + xSize + 2;
 
                 mesh.triangles = triangles;
-                yield return new WaitForSeconds(0f);
             }
         }
         SmoothTerrainTransition(); // Color the terrain after it has been generated.
@@ -159,47 +156,32 @@ public class LandscapeGenerator : MonoBehaviour
         float zCoord = (float)z / zSize * plainsScale;
 
         // Use Perlin noise to generate terrain
-        float plainsHeight = Mathf.PerlinNoise(xCoord, zCoord);
-
         // Apply scaling and offset to the height
-        plainsHeight += baseHeight;
+        float plainsHeight = baseHeight + Mathf.PerlinNoise(xCoord, zCoord);
 
         return plainsHeight;
     }
 
     private void GenerateTrees()
     {
-        for (int z = 0; z <= zSize; z++)
+        // Generate Poisson disc samples for the forest biome at this specific point
+        List<Vector2> treePositions = DiscSampling.GeneratePoints(biomeMap, givenRadius, new Vector2(xSize, zSize), Mathf.FloorToInt(treeDensity * 10)); // Adjust the density
+
+        // Iterate through the tree placement points and instantiate trees
+        foreach (Vector2 position in treePositions)
         {
-            for (int x = 0; x <= xSize; x++)
+            // Use the height at the tree's grid position
+            float treeHeight = vertices[Mathf.FloorToInt(position.y) * (xSize + 1) + Mathf.FloorToInt(position.x)].y;
+            if (treeHeight < 7)
             {
-                BiomeType biome = biomeMap[x, z];
-
-                if (biome == BiomeType.Forest)
+                if (treeHeight > 5)
                 {
-                    // Define the region for Poisson disc sampling within the forest biome
-                    Vector2 forestRegionSize = new Vector2(2, 2);
-
-                    // Generate Poisson disc samples for the forest biome at this specific point
-                    List<Vector2> treePositions = DiscSampling.GeneratePoints(biomeMap, 1, forestRegionSize, Mathf.FloorToInt(treeDensity * 30)); // Adjust the density
-
-                    // Iterate through the tree placement points and instantiate trees
-                    foreach (Vector2 position in treePositions)
-                    {
-                        // Get the grid coordinates within the terrain
-                        float treeX = position.x + x;
-                        float treeZ = position.y + z;
-
-                        // Make sure the grid coordinates are within bounds
-                        if (treeX >= 0 && treeX <= xSize && treeZ >= 0 && treeZ <= zSize)
-                        {
-                            // Use the height at the tree's grid position
-                            float treeHeight = vertices[Mathf.FloorToInt(treeZ) * (xSize + 1) + Mathf.FloorToInt(treeX)].y;
-
-                            // Instantiate the tree at the correct height
-                            Instantiate(treePrefab, new Vector3(treeX, treeHeight, treeZ), Quaternion.identity);
-                        }
-                    }
+                    // Instantiate the tree at the correct height
+                    Instantiate(pinetreePrefab, new Vector3(position.x, treeHeight, position.y), Quaternion.identity);
+                }
+                else
+                {
+                    Instantiate(lushtreePrefab, new Vector3(position.x, treeHeight, position.y), Quaternion.identity);
                 }
             }
         }
@@ -207,7 +189,13 @@ public class LandscapeGenerator : MonoBehaviour
 
     private float GenerateForestTerrain(int x, int z)
     {
-        float forestHeight = baseHeight + 1;
+        float forestHeight;
+        // Scale the coordinates to control the feature size
+        float xCoord = (float)x / xSize * plainsScale;
+        float zCoord = (float)z / zSize * plainsScale;
+
+        // Use Perlin noise to generate terrain
+        forestHeight = baseHeight + 1 + Mathf.PerlinNoise(xCoord, zCoord);
         return forestHeight;
     }
 
@@ -322,24 +310,12 @@ public class LandscapeGenerator : MonoBehaviour
 
     private void OnDrawGizmos()
     {
-        if (vertices == null)
-        {
-            return;
-        }
-
-        Gizmos.color = Color.black;
-        for (int i = 0; i < vertices.Length; i++)
-        {
-            //Gizmos.DrawSphere(vertices[i], 0.1f);
-        }
+        float sphereSize = 0.1f;
 
         if (biomeMap == null)
         {
             return;
         }
-
-        Gizmos.color = Color.red;
-        float sphereSize = 0.1f;
 
         for (int x = 0; x <= xSize; x++)
         {

@@ -4,7 +4,7 @@ using UnityEngine;
 
 public static class DiscSampling
 {
-    public static List<Vector2> GeneratePoints(LandscapeGenerator.BiomeType[,] biomeMap, float radius, Vector2 sampleRegionSize, int numSamplesBR = 30)
+    public static List<Vector2> GeneratePoints(LandscapeGenerator.BiomeType[,] biomeMap, float radius, Vector2 sampleRegionSize, int numSamplesBR = 10)
     {
         float cellSize = radius / Mathf.Sqrt(2);
         int[,] grid = new int[Mathf.CeilToInt(sampleRegionSize.x / cellSize), Mathf.CeilToInt(sampleRegionSize.y / cellSize)];
