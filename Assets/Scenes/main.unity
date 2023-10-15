@@ -229,6 +229,7 @@ GameObject:
   - component: {fileID: 1470579243}
   - component: {fileID: 1470579245}
   - component: {fileID: 1470579244}
+  - component: {fileID: 1470579246}
   m_Layer: 3
   m_Name: Landscape Generator
   m_TagString: Untagged
@@ -265,6 +266,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   xSize: 100
   zSize: 100
+  collider: {fileID: 1470579246}
   baseHeight: 0
   gradient:
     serializedVersion: 2
@@ -300,6 +302,9 @@ MonoBehaviour:
   lushtreePrefab: {fileID: 5213287632809392628, guid: 6b5da46f52943864599e90dd0f6ec82e, type: 3}
   treeDensity: 0.2
   givenRadius: 0.2
+  terrain:
+    serializedVersion: 2
+    m_Bits: 8
   mountainScale: 5
   plainsScale: 2
   smoothingStrenght: 2
@@ -357,6 +362,28 @@ MeshFilter:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1470579241}
+  m_Mesh: {fileID: 0}
+--- !u!64 &1470579246
+MeshCollider:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1470579241}
+  m_Material: {fileID: 0}
+  m_IncludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ExcludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_LayerOverridePriority: 0
+  m_IsTrigger: 0
+  m_ProvidesContacts: 0
+  m_Enabled: 1
+  serializedVersion: 5
+  m_Convex: 0
+  m_CookingOptions: 30
   m_Mesh: {fileID: 0}
 --- !u!1 &2053604586
 GameObject:

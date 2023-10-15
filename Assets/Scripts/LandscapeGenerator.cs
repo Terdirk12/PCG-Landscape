@@ -8,10 +8,12 @@ public class LandscapeGenerator : MonoBehaviour
     public int xSize, zSize;
     private Vector3[] vertices;
     private Mesh mesh;
+    public MeshCollider collider;
     public float baseHeight;
     public Gradient gradient;
     public GameObject pinetreePrefab, lushtreePrefab; // Reference to your tree prefab
     public float treeDensity = 0.3f, givenRadius = 0.5f; // Adjust the density of trees in the forest biome
+    public LayerMask terrain;
 
     public enum BiomeType
     {
@@ -61,11 +63,13 @@ public class LandscapeGenerator : MonoBehaviour
                 // You can adjust these thresholds to determine the biome distribution
                 if (plainsNoise < 0.4f)
                 {
-                    biomeMap[x, z] = BiomeType.Ocean;
+                    if (IsNearMountains(x, z)) biomeMap[x, z] = BiomeType.Forest;
+                    else biomeMap[x, z] = BiomeType.Ocean;
                 }
                 else if (plainsNoise < 0.6f)
                 {
-                    biomeMap[x, z] = BiomeType.Plains;
+                    if (IsNearMountains(x, z)) biomeMap[x, z] = BiomeType.Forest;
+                    else biomeMap[x, z] = BiomeType.Plains;
                 }
                 else if (forestNoise < 0.4f)
                 {
@@ -77,7 +81,9 @@ public class LandscapeGenerator : MonoBehaviour
                 }
                 else
                 {
-                    biomeMap[x, z] = BiomeType.Plains; // Default to Plains if none of the conditions match
+                    if(IsNearMountains(x, z)) biomeMap[x, z] = BiomeType.Forest;
+                    else biomeMap[x, z] = BiomeType.Plains; // Default to Plains if none of the conditions match
+
                 }
             }
         }
@@ -178,27 +184,78 @@ public class LandscapeGenerator : MonoBehaviour
 
             if (biome == BiomeType.Forest)
             {
-                // Use the height at the tree's grid position
-                float treeHeight = vertices[Mathf.FloorToInt(position.y) * (xSize + 1) + Mathf.FloorToInt(position.x)].y;
-                if (treeHeight < 7)
-                {
-                    GameObject treeObject; // The instantiated tree object
-                    if (treeHeight > 5)
-                    {
-                        treeHeight += Random.Range(-0.05f, 0.05f);
-                        treeObject = Instantiate(pinetreePrefab, new Vector3(position.x, treeHeight, position.y), Quaternion.identity);
-                    }
-                    else
-                    {
-                        treeHeight += Random.Range(-0.05f, 0.05f);
-                        treeObject = Instantiate(lushtreePrefab, new Vector3(position.x, treeHeight, position.y), Quaternion.identity);
-                    }
+                // Count the number of forest neighbors
+                int forestNeighbors = CountForestNeighbors(Mathf.FloorToInt(position.x), Mathf.FloorToInt(position.y));
 
-                    // Set the tree object as a child of the treeContainer
-                    treeObject.transform.parent = treeContainer.transform;
+                // Calculate the tree density based on the number of forest neighbors
+                float density = Mathf.Lerp(0.25f, 1.0f, forestNeighbors / 8.0f); // Adjust these values as needed
+
+                if (Random.value < density)
+                {
+                    // Use the height at the tree's grid position
+                    //float treeHeight = vertices[Mathf.FloorToInt(position.y) * (xSize + 1) + Mathf.FloorToInt(position.x)].y;
+                    float treeHeight = SampleTerrainHeight(position);
+                    if (treeHeight < 6)
+                    {
+                        GameObject treeObject; // The instantiated tree object
+                        if (treeHeight > 3.5f)
+                        {
+                            treeHeight += Random.Range(-0.05f, 0.05f);
+                            treeObject = Instantiate(pinetreePrefab, new Vector3(position.x, treeHeight, position.y), Quaternion.identity);
+                        }
+                        else
+                        {
+                            treeHeight += Random.Range(-0.05f, 0.05f);
+                            treeObject = Instantiate(lushtreePrefab, new Vector3(position.x, treeHeight, position.y), Quaternion.identity);
+                        }
+
+                        // Set the tree object as a child of the treeContainer
+                        treeObject.transform.parent = treeContainer.transform;
+                    }
                 }
             }
         }
+    }
+
+    private float SampleTerrainHeight(Vector2 position)
+    {
+        Vector3 placementPoint = new Vector3(position.x, 0, position.y);
+
+        // Trilinear interpolation
+        float height = 0f;
+
+        RaycastHit hit;
+        if (Physics.Raycast(placementPoint + Vector3.up * 100, Vector3.down, out hit, Mathf.Infinity, terrain))
+        {
+            height = hit.point.y;
+        }
+
+        return height;
+    }
+
+    private int CountForestNeighbors(int x, int z)
+    {
+        int forestCount = 0;
+
+        for (int dz = -1; dz <= 1; dz++)
+        {
+            for (int dx = -1; dx <= 1; dx++)
+            {
+                int neighborX = x + dx;
+                int neighborZ = z + dz;
+
+                // Ensure the neighbor is within bounds
+                if (neighborX >= 0 && neighborX < xSize && neighborZ >= 0 && neighborZ < zSize)
+                {
+                    if (biomeMap[neighborX, neighborZ] == BiomeType.Forest)
+                    {
+                        forestCount++;
+                    }
+                }
+            }
+        }
+
+        return forestCount;
     }
 
     private float GenerateForestTerrain(int x, int z)
@@ -295,8 +352,47 @@ public class LandscapeGenerator : MonoBehaviour
         // Update the mesh with the smoothed heights
         mesh.vertices = vertices;
         mesh.RecalculateNormals();
+        collider.sharedMesh = mesh;
         ColorTerrain(); // Color the terrain after it has been generated.
         GenerateTrees(); // Generate trees.
+    }
+
+    // Function to check if a point is near mountains
+    private bool IsNearMountains(int x, int z)
+    {
+        // Define a range within which a point is considered near mountains
+        float mountainRange = 3.0f; // Adjust this range as needed
+
+        // Check the biome type for the specified point
+        BiomeType biome = biomeMap[x, z];
+
+        // If the biome is Mountains or within the specified range of Mountains, return true
+        if (biome == BiomeType.Mountains)
+        {
+            return true;
+        }
+
+        // Iterate through the entire terrain and find the closest mountain
+        float closestMountainDistance = float.MaxValue;
+
+        for (int mx = 0; mx <= xSize; mx++)
+        {
+            for (int mz = 0; mz <= zSize; mz++)
+            {
+                if (biomeMap[mx, mz] == BiomeType.Mountains)
+                {
+                    // Calculate the distance between the current point and the mountain
+                    float distance = Vector2.Distance(new Vector2(x, z), new Vector2(mx, mz));
+
+                    if (distance < closestMountainDistance)
+                    {
+                        closestMountainDistance = distance;
+                    }
+                }
+            }
+        }
+
+        return closestMountainDistance <= mountainRange;
     }
 
     private void ColorTerrain()
