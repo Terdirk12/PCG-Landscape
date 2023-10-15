@@ -8,7 +8,9 @@ public class LandscapeGenerator : MonoBehaviour
     public int xSize, zSize;
     private Vector3[] vertices;
     private Mesh mesh;
+#pragma warning disable CS0108 // Member hides inherited member; missing new keyword
     public MeshCollider collider;
+#pragma warning restore CS0108 // Member hides inherited member; missing new keyword
     public float baseHeight;
     public Gradient gradient;
     public GameObject pinetreePrefab, lushtreePrefab; // Reference to your tree prefab
@@ -63,13 +65,11 @@ public class LandscapeGenerator : MonoBehaviour
                 // You can adjust these thresholds to determine the biome distribution
                 if (plainsNoise < 0.4f)
                 {
-                    if (IsNearMountains(x, z)) biomeMap[x, z] = BiomeType.Forest;
-                    else biomeMap[x, z] = BiomeType.Ocean;
+                    biomeMap[x, z] = BiomeType.Ocean;
                 }
                 else if (plainsNoise < 0.6f)
                 {
-                    if (IsNearMountains(x, z)) biomeMap[x, z] = BiomeType.Forest;
-                    else biomeMap[x, z] = BiomeType.Plains;
+                    biomeMap[x, z] = BiomeType.Plains;
                 }
                 else if (forestNoise < 0.4f)
                 {
@@ -81,9 +81,23 @@ public class LandscapeGenerator : MonoBehaviour
                 }
                 else
                 {
-                    if(IsNearMountains(x, z)) biomeMap[x, z] = BiomeType.Forest;
-                    else biomeMap[x, z] = BiomeType.Plains; // Default to Plains if none of the conditions match
+                    biomeMap[x, z] = BiomeType.Plains; // Default to Plains if none of the conditions match
 
+                }
+            }
+        }
+        MakeBiomeRings();
+    }
+
+    private void MakeBiomeRings()
+    {
+        for (int x = 0; x <= xSize; x++)
+        {
+            for (int z = 0; z <= zSize; z++)
+            {
+                if (biomeMap[x, z] != BiomeType.Mountains)
+                {
+                    if (IsNearBiome(x, z, BiomeType.Mountains)) biomeMap[x, z] = BiomeType.Forest;
                 }
             }
         }
@@ -195,13 +209,19 @@ public class LandscapeGenerator : MonoBehaviour
                     // Use the height at the tree's grid position
                     //float treeHeight = vertices[Mathf.FloorToInt(position.y) * (xSize + 1) + Mathf.FloorToInt(position.x)].y;
                     float treeHeight = SampleTerrainHeight(position);
-                    if (treeHeight < 6)
+                    if (treeHeight < 4.5f)
                     {
                         GameObject treeObject; // The instantiated tree object
                         if (treeHeight > 3.5f)
                         {
                             treeHeight += Random.Range(-0.05f, 0.05f);
                             treeObject = Instantiate(pinetreePrefab, new Vector3(position.x, treeHeight, position.y), Quaternion.identity);
+                        }
+                        else if (treeHeight > 3f)
+                        {
+                            float R = Random.Range(0, 2);
+                            if(R == 1) treeObject = Instantiate(lushtreePrefab, new Vector3(position.x, treeHeight, position.y), Quaternion.identity);
+                            else treeObject = Instantiate(pinetreePrefab, new Vector3(position.x, treeHeight, position.y), Quaternion.identity);
                         }
                         else
                         {
@@ -358,41 +378,41 @@ public class LandscapeGenerator : MonoBehaviour
     }
 
     // Function to check if a point is near mountains
-    private bool IsNearMountains(int x, int z)
+    private bool IsNearBiome(int x, int z, BiomeType locationBiome)
     {
         // Define a range within which a point is considered near mountains
-        float mountainRange = 3.0f; // Adjust this range as needed
+        float Range = 3.0f; // Adjust this range as needed
 
         // Check the biome type for the specified point
         BiomeType biome = biomeMap[x, z];
 
         // If the biome is Mountains or within the specified range of Mountains, return true
-        if (biome == BiomeType.Mountains)
+        if (biome == locationBiome)
         {
             return true;
         }
 
         // Iterate through the entire terrain and find the closest mountain
-        float closestMountainDistance = float.MaxValue;
+        float closestBiomeDistance = float.MaxValue;
 
         for (int mx = 0; mx <= xSize; mx++)
         {
             for (int mz = 0; mz <= zSize; mz++)
             {
-                if (biomeMap[mx, mz] == BiomeType.Mountains)
+                if (biomeMap[mx, mz] == locationBiome)
                 {
                     // Calculate the distance between the current point and the mountain
                     float distance = Vector2.Distance(new Vector2(x, z), new Vector2(mx, mz));
 
-                    if (distance < closestMountainDistance)
+                    if (distance < closestBiomeDistance)
                     {
-                        closestMountainDistance = distance;
+                        closestBiomeDistance = distance;
                     }
                 }
             }
         }
 
-        return closestMountainDistance <= mountainRange;
+        return closestBiomeDistance <= Range;
     }
 
     private void ColorTerrain()
