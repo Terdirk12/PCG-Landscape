@@ -1,5 +1,6 @@
 using System.Collections;
 using System.Collections.Generic;
+using UnityEditor;
 using UnityEngine;
 
 [RequireComponent(typeof(MeshFilter), typeof(MeshRenderer))]
@@ -220,7 +221,7 @@ public class LandscapeGenerator : MonoBehaviour
                         else if (treeHeight > 3f)
                         {
                             float R = Random.Range(0, 2);
-                            if(R == 1) treeObject = Instantiate(lushtreePrefab, new Vector3(position.x, treeHeight, position.y), Quaternion.identity);
+                            if (R == 1) treeObject = Instantiate(lushtreePrefab, new Vector3(position.x, treeHeight, position.y), Quaternion.identity);
                             else treeObject = Instantiate(pinetreePrefab, new Vector3(position.x, treeHeight, position.y), Quaternion.identity);
                         }
                         else
@@ -312,9 +313,7 @@ public class LandscapeGenerator : MonoBehaviour
 
             // Apply the ridgeValue to accentuate peaks
             height += ridgeValue + noiseValue * amplitude;
-
         }
-
         return height + 2;
     }
 
@@ -326,52 +325,55 @@ public class LandscapeGenerator : MonoBehaviour
 
     private void SmoothTerrainTransition()
     {
-        for (int z = 0; z < zSize; z++)
+        for (int z = 0; z < zSize - 1; z++)
         {
-            for (int x = 0; x < xSize; x++)
+            for (int x = 0; x < xSize - 1; x++)
             {
-                int vertexIndex = z * xSize + x;
-                Vector3 vertexPosition = vertices[vertexIndex];
-                float vertexHeight = vertexPosition.y;
-
-                // Check the neighboring vertices within the transition range
-                float totalHeight = vertexHeight;
-                int neighborCount = neighbors;
-
-                for (int dz = -1; dz <= 1; dz++)
+                if (x != z && x != xSize && z != zSize)
                 {
-                    for (int dx = -1; dx <= 1; dx++)
+                    int vertexIndex = z * xSize + x;
+                    Vector3 vertexPosition = vertices[vertexIndex];
+                    float vertexHeight = vertexPosition.y;
+
+                    // Check the neighboring vertices within the transition range
+                    float totalHeight = vertexHeight;
+                    int neighborCount = neighbors;
+
+                    for (int dz = -1; dz <= 1; dz++)
                     {
-                        int neighborX = x + dx;
-                        int neighborZ = z + dz;
-
-                        // Ensure the neighbor is within bounds
-                        if (neighborX >= 0 && neighborX < xSize && neighborZ >= 0 && neighborZ < zSize)
+                        for (int dx = -1; dx <= 1; dx++)
                         {
-                            int neighborIndex = neighborZ * xSize + neighborX;
-                            float neighborHeight = vertices[neighborIndex].y;
+                            int neighborX = x + dx;
+                            int neighborZ = z + dz;
 
-                            // Check if the neighbor is within the transition range
-                            if (Mathf.Abs(neighborHeight - vertexHeight) <= transitionRange)
+                            // Ensure the neighbor is within bounds
+                            if (neighborX >= 0 && neighborX < xSize && neighborZ >= 0 && neighborZ < zSize)
                             {
-                                totalHeight += neighborHeight * smoothingStrenght;
-                                neighborCount++;
+                                int neighborIndex = neighborZ * xSize + neighborX;
+                                float neighborHeight = vertices[neighborIndex].y;
+
+                                // Check if the neighbor is within the transition range
+                                if (Mathf.Abs(neighborHeight - vertexHeight) <= transitionRange)
+                                {
+                                    totalHeight += neighborHeight * smoothingStrenght;
+                                    neighborCount++;
+                                }
                             }
                         }
                     }
+                    // Calculate the average height within the transition range
+                    float averageHeight = totalHeight / neighborCount;
+
+                    // Update the vertex height
+                    vertices[vertexIndex] = new Vector3(vertexPosition.x, averageHeight, vertexPosition.z);
                 }
-
-                // Calculate the average height within the transition range
-                float averageHeight = totalHeight / neighborCount;
-
-                // Update the vertex height
-                vertices[vertexIndex] = new Vector3(vertexPosition.x, averageHeight, vertexPosition.z);
             }
         }
 
         // Update the mesh with the smoothed heights
         mesh.vertices = vertices;
         mesh.RecalculateNormals();
+        mesh.RecalculateTangents();
         collider.sharedMesh = mesh;
         ColorTerrain(); // Color the terrain after it has been generated.
         GenerateTrees(); // Generate trees.
@@ -447,34 +449,42 @@ public class LandscapeGenerator : MonoBehaviour
             return;
         }
 
-        for (int x = 0; x <= xSize; x++)
+        Gizmos.color = Color.black;
+        for (int i = 0; i < vertices.Length; i++)
         {
-            for (int z = 0; z <= zSize; z++)
-            {
-                Vector3 position = new Vector3(x, 0f, z);
-                BiomeType biome = biomeMap[x, z];
+            Handles.Label(vertices[i], $"x: {vertices[i].x}, y: {vertices[i].y}, z: {vertices[i].z}");
 
-                switch (biome)
-                {
-                    case BiomeType.Plains:
-                        Gizmos.color = Color.green;
-                        break;
-                    case BiomeType.Forest:
-                        Gizmos.color = Color.red;
-                        break;
-                    case BiomeType.Mountains:
-                        Gizmos.color = Color.gray;
-                        break;
-                    case BiomeType.Ocean:
-                        Gizmos.color = Color.blue;
-                        break;
-                    default:
-                        Gizmos.color = Color.white;
-                        break;
-                }
-
-                Gizmos.DrawSphere(position, sphereSize);
-            }
+            //Gizmos.DrawSphere(vertices[i], sphereSize);
         }
+        /*
+                for (int x = 0; x <= xSize; x++)
+                {
+                    for (int z = 0; z <= zSize; z++)
+                    {
+                        Vector3 position = new Vector3(x, 0f, z);
+                        BiomeType biome = biomeMap[x, z];
+
+                        switch (biome)
+                        {
+                            case BiomeType.Plains:
+                                Gizmos.color = Color.green;
+                                break;
+                            case BiomeType.Forest:
+                                Gizmos.color = Color.red;
+                                break;
+                            case BiomeType.Mountains:
+                                Gizmos.color = Color.gray;
+                                break;
+                            case BiomeType.Ocean:
+                                Gizmos.color = Color.blue;
+                                break;
+                            default:
+                                Gizmos.color = Color.white;
+                                break;
+                        }
+
+                        Gizmos.DrawSphere(position, sphereSize);
+                    }
+                }*/
     }
 }
