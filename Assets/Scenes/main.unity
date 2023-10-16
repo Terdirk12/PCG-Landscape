@@ -406,12 +406,13 @@ MonoBehaviour:
     m_NumAlphaKeys: 3
   pinetreePrefab: {fileID: 3120736601316317737, guid: 8c7de374443d22c438f0bbb817f1312f, type: 3}
   lushtreePrefab: {fileID: 5213287632809392628, guid: 6b5da46f52943864599e90dd0f6ec82e, type: 3}
+  bushPrefab: {fileID: 4064818071302427170, guid: d99d9a8863727b2419a822af5d7ad2d6, type: 3}
   treeDensity: 0.3
   givenRadius: 0.2
   terrain:
     serializedVersion: 2
     m_Bits: 8
-  mountainScale: 5
+  mountainScale: 6
   plainsScale: 2
   smoothingStrenght: 2
   transitionRange: 5

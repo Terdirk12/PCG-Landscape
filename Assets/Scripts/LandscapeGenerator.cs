@@ -14,7 +14,7 @@ public class LandscapeGenerator : MonoBehaviour
 #pragma warning restore CS0108 // Member hides inherited member; missing new keyword
     public float baseHeight;
     public Gradient gradient;
-    public GameObject pinetreePrefab, lushtreePrefab; // Reference to your tree prefab
+    public GameObject pinetreePrefab, lushtreePrefab, bushPrefab; // Reference to your tree prefab
     public float treeDensity = 0.3f, givenRadius = 0.5f; // Adjust the density of trees in the forest biome
     public LayerMask terrain;
 
@@ -205,14 +205,15 @@ public class LandscapeGenerator : MonoBehaviour
                 // Calculate the tree density based on the number of forest neighbors
                 float density = Mathf.Lerp(0.25f, 1.0f, forestNeighbors / 8.0f); // Adjust these values as needed
 
+
                 if (Random.value < density)
                 {
                     // Use the height at the tree's grid position
                     //float treeHeight = vertices[Mathf.FloorToInt(position.y) * (xSize + 1) + Mathf.FloorToInt(position.x)].y;
                     float treeHeight = SampleTerrainHeight(position);
+                    GameObject treeObject; // The instantiated tree object
                     if (treeHeight < 4.5f)
                     {
-                        GameObject treeObject; // The instantiated tree object
                         if (treeHeight > 3.5f)
                         {
                             treeHeight += Random.Range(-0.05f, 0.05f);
@@ -234,6 +235,18 @@ public class LandscapeGenerator : MonoBehaviour
                         treeObject.transform.parent = treeContainer.transform;
                     }
                 }
+                else
+                {
+                    GameObject bushObject; // The instantiated tree object
+
+                    float treeHeight = SampleTerrainHeight(position);
+                    bushObject = Instantiate(bushPrefab, new Vector3(position.x, treeHeight, position.y), Quaternion.identity);
+
+                    // Set the bush object as a child of the treeContainer
+                    bushObject.transform.parent = treeContainer.transform;
+                    Debug.Log("haha forest edge funny");
+                }
+
             }
         }
     }
@@ -325,48 +338,45 @@ public class LandscapeGenerator : MonoBehaviour
 
     private void SmoothTerrainTransition()
     {
-        for (int z = 0; z < zSize - 1; z++)
+        for (int z = 0; z < zSize; z++)
         {
-            for (int x = 0; x < xSize - 1; x++)
+            for (int x = 0; x < xSize; x++)
             {
-                if (x != z && x != xSize && z != zSize)
+                int vertexIndex = z * xSize + x;
+                Vector3 vertexPosition = vertices[vertexIndex];
+                float vertexHeight = vertexPosition.y;
+
+                // Check the neighboring vertices within the transition range
+                float totalHeight = vertexHeight;
+                int neighborCount = neighbors;
+
+                for (int dz = -1; dz <= 1; dz++)
                 {
-                    int vertexIndex = z * xSize + x;
-                    Vector3 vertexPosition = vertices[vertexIndex];
-                    float vertexHeight = vertexPosition.y;
-
-                    // Check the neighboring vertices within the transition range
-                    float totalHeight = vertexHeight;
-                    int neighborCount = neighbors;
-
-                    for (int dz = -1; dz <= 1; dz++)
+                    for (int dx = -1; dx <= 1; dx++)
                     {
-                        for (int dx = -1; dx <= 1; dx++)
+                        int neighborX = x + dx;
+                        int neighborZ = z + dz;
+
+                        // Ensure the neighbor is within bounds
+                        if (neighborX >= 0 && neighborX < xSize && neighborZ >= 0 && neighborZ < zSize)
                         {
-                            int neighborX = x + dx;
-                            int neighborZ = z + dz;
+                            int neighborIndex = neighborZ * xSize + neighborX;
+                            float neighborHeight = vertices[neighborIndex].y;
 
-                            // Ensure the neighbor is within bounds
-                            if (neighborX >= 0 && neighborX < xSize && neighborZ >= 0 && neighborZ < zSize)
+                            // Check if the neighbor is within the transition range
+                            if (Mathf.Abs(neighborHeight - vertexHeight) <= transitionRange)
                             {
-                                int neighborIndex = neighborZ * xSize + neighborX;
-                                float neighborHeight = vertices[neighborIndex].y;
-
-                                // Check if the neighbor is within the transition range
-                                if (Mathf.Abs(neighborHeight - vertexHeight) <= transitionRange)
-                                {
-                                    totalHeight += neighborHeight * smoothingStrenght;
-                                    neighborCount++;
-                                }
+                                totalHeight += neighborHeight * smoothingStrenght;
+                                neighborCount++;
                             }
                         }
                     }
-                    // Calculate the average height within the transition range
-                    float averageHeight = totalHeight / neighborCount;
-
-                    // Update the vertex height
-                    vertices[vertexIndex] = new Vector3(vertexPosition.x, averageHeight, vertexPosition.z);
                 }
+                // Calculate the average height within the transition range
+                float averageHeight = totalHeight / neighborCount;
+
+                // Update the vertex height
+                vertices[vertexIndex] = new Vector3(vertexPosition.x, averageHeight, vertexPosition.z);
             }
         }
 
@@ -452,39 +462,39 @@ public class LandscapeGenerator : MonoBehaviour
         Gizmos.color = Color.black;
         for (int i = 0; i < vertices.Length; i++)
         {
-            Handles.Label(vertices[i], $"x: {vertices[i].x}, y: {vertices[i].y}, z: {vertices[i].z}");
+            //Handles.Label(vertices[i], $"x: {vertices[i].x}, y: {vertices[i].y}, z: {vertices[i].z}");
 
             //Gizmos.DrawSphere(vertices[i], sphereSize);
         }
-        /*
-                for (int x = 0; x <= xSize; x++)
+
+        for (int x = 0; x <= xSize; x++)
+        {
+            for (int z = 0; z <= zSize; z++)
+            {
+                Vector3 position = new Vector3(x, 0f, z);
+                BiomeType biome = biomeMap[x, z];
+
+                switch (biome)
                 {
-                    for (int z = 0; z <= zSize; z++)
-                    {
-                        Vector3 position = new Vector3(x, 0f, z);
-                        BiomeType biome = biomeMap[x, z];
+                    case BiomeType.Plains:
+                        Gizmos.color = Color.green;
+                        break;
+                    case BiomeType.Forest:
+                        Gizmos.color = Color.red;
+                        break;
+                    case BiomeType.Mountains:
+                        Gizmos.color = Color.gray;
+                        break;
+                    case BiomeType.Ocean:
+                        Gizmos.color = Color.blue;
+                        break;
+                    default:
+                        Gizmos.color = Color.white;
+                        break;
+                }
 
-                        switch (biome)
-                        {
-                            case BiomeType.Plains:
-                                Gizmos.color = Color.green;
-                                break;
-                            case BiomeType.Forest:
-                                Gizmos.color = Color.red;
-                                break;
-                            case BiomeType.Mountains:
-                                Gizmos.color = Color.gray;
-                                break;
-                            case BiomeType.Ocean:
-                                Gizmos.color = Color.blue;
-                                break;
-                            default:
-                                Gizmos.color = Color.white;
-                                break;
-                        }
-
-                        Gizmos.DrawSphere(position, sphereSize);
-                    }
-                }*/
+                Gizmos.DrawSphere(position, sphereSize);
+            }
+        }
     }
 }
