@@ -237,16 +237,18 @@ public class LandscapeGenerator : MonoBehaviour
                 }
                 else
                 {
+                    float bushHeight = SampleTerrainHeight(position);
                     GameObject bushObject; // The instantiated tree object
+                    if (bushHeight < 3.5f)
+                    {
 
-                    float treeHeight = SampleTerrainHeight(position);
-                    bushObject = Instantiate(bushPrefab, new Vector3(position.x, treeHeight, position.y), Quaternion.identity);
+                        float treeHeight = SampleTerrainHeight(position);
+                        bushObject = Instantiate(bushPrefab, new Vector3(position.x, treeHeight, position.y), Quaternion.identity);
 
-                    // Set the bush object as a child of the treeContainer
-                    bushObject.transform.parent = treeContainer.transform;
-                    Debug.Log("haha forest edge funny");
+                        // Set the bush object as a child of the treeContainer
+                        bushObject.transform.parent = treeContainer.transform;
+                    }
                 }
-
             }
         }
     }
@@ -338,11 +340,11 @@ public class LandscapeGenerator : MonoBehaviour
 
     private void SmoothTerrainTransition()
     {
-        for (int z = 0; z < zSize; z++)
+        for (int i = 0, z = 0; z <= zSize; z++)
         {
-            for (int x = 0; x < xSize; x++)
+            for (int x = 0; x <= xSize; x++, i++)
             {
-                int vertexIndex = z * xSize + x;
+                int vertexIndex = z * (xSize + 1) + x;
                 Vector3 vertexPosition = vertices[vertexIndex];
                 float vertexHeight = vertexPosition.y;
 
@@ -358,9 +360,9 @@ public class LandscapeGenerator : MonoBehaviour
                         int neighborZ = z + dz;
 
                         // Ensure the neighbor is within bounds
-                        if (neighborX >= 0 && neighborX < xSize && neighborZ >= 0 && neighborZ < zSize)
+                        if (neighborX >= 0 && neighborX <= xSize && neighborZ >= 0 && neighborZ <= zSize)
                         {
-                            int neighborIndex = neighborZ * xSize + neighborX;
+                            int neighborIndex = neighborZ * (xSize + 1) + neighborX;
                             float neighborHeight = vertices[neighborIndex].y;
 
                             // Check if the neighbor is within the transition range
@@ -372,6 +374,7 @@ public class LandscapeGenerator : MonoBehaviour
                         }
                     }
                 }
+
                 // Calculate the average height within the transition range
                 float averageHeight = totalHeight / neighborCount;
 
@@ -463,7 +466,6 @@ public class LandscapeGenerator : MonoBehaviour
         for (int i = 0; i < vertices.Length; i++)
         {
             //Handles.Label(vertices[i], $"x: {vertices[i].x}, y: {vertices[i].y}, z: {vertices[i].z}");
-
             //Gizmos.DrawSphere(vertices[i], sphereSize);
         }
 
