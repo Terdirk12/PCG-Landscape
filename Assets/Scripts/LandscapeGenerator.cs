@@ -15,15 +15,18 @@ public class LandscapeGenerator : MonoBehaviour
     public float baseHeight;
     public Gradient gradient;
     public GameObject pinetreePrefab, lushtreePrefab, bushPrefab; // Reference to your tree prefab
-    public float treeDensity = 0.3f, givenRadius = 0.5f; // Adjust the density of trees in the forest biome
+    public float treeDensity = 0.3f, givenRadius = 0.5f, riverStartWidth = 5f, riverStartDepth = 2f; // Adjust the density of trees in the forest biome
     public LayerMask terrain;
+    private int mountainCount;
+    private List<Vector3> riverStartPoints = new List<Vector3>();
 
     public enum BiomeType
     {
         Plains,
         Forest,
         Mountains,
-        Ocean
+        Ocean,
+        River
     }
 
     private BiomeType[,] biomeMap; // Define a 2D biome map
@@ -35,6 +38,8 @@ public class LandscapeGenerator : MonoBehaviour
     {
         InitializeBiomeMap(); // Initialize the biome map  
     }
+
+    #region biomes
 
     private void InitializeBiomeMap()
     {
@@ -79,6 +84,8 @@ public class LandscapeGenerator : MonoBehaviour
                 else if (mountainsNoise < 0.5f)
                 {
                     biomeMap[x, z] = BiomeType.Mountains;
+                    mountainCount++;
+                    Debug.Log("i need more mountains");
                 }
                 else
                 {
@@ -170,6 +177,47 @@ public class LandscapeGenerator : MonoBehaviour
         SmoothTerrainTransition(); // Color the terrain after it has been generated.
     }
 
+    // Function to check if a point is near mountains
+    private bool IsNearBiome(int x, int z, BiomeType locationBiome)
+    {
+        // Define a range within which a point is considered near mountains
+        float Range = 3.0f; // Adjust this range as needed
+
+        // Check the biome type for the specified point
+        BiomeType biome = biomeMap[x, z];
+
+        // If the biome is Mountains or within the specified range of Mountains, return true
+        if (biome == locationBiome)
+        {
+            return true;
+        }
+
+        // Iterate through the entire terrain and find the closest mountain
+        float closestBiomeDistance = float.MaxValue;
+
+        for (int mx = 0; mx <= xSize; mx++)
+        {
+            for (int mz = 0; mz <= zSize; mz++)
+            {
+                if (biomeMap[mx, mz] == locationBiome)
+                {
+                    // Calculate the distance between the current point and the mountain
+                    float distance = Vector2.Distance(new Vector2(x, z), new Vector2(mx, mz));
+
+                    if (distance < closestBiomeDistance)
+                    {
+                        closestBiomeDistance = distance;
+                    }
+                }
+            }
+        }
+
+        return closestBiomeDistance <= Range;
+    }
+
+    #endregion
+
+    #region Plains, Mountain & Ocean
     private float GeneratePlainsTerrain(int x, int z)
     {
         // Scale the coordinates to control the feature size
@@ -182,6 +230,43 @@ public class LandscapeGenerator : MonoBehaviour
 
         return plainsHeight;
     }
+
+
+    private float GenerateMountainousTerrain(int x, int z)
+    {
+        // Calculate the position in the noise field
+        float sampleX = (float)x / xSize;
+        float sampleZ = (float)z / zSize;
+
+        float height = baseHeight;
+        float amplitude = 1;
+        float frequency = 1;
+
+        for (int i = 0; i < octaves; i++)
+        {
+            amplitude = Mathf.Pow(persistence, i);
+            frequency *= lacunarity;
+
+            float noiseValue = Mathf.PerlinNoise(sampleX * frequency, sampleZ * frequency);
+
+            // Calculate ridged multifractal noise
+            float ridgeValue = Mathf.Abs(2 * noiseValue - 1);
+
+            // Apply the ridgeValue to accentuate peaks
+            height += ridgeValue + noiseValue * amplitude;
+        }
+        return height + 2;
+    }
+
+    private float GenerateOceanTerrain(int x, int z)
+    {
+        int oceanHeight = -1;
+        return oceanHeight;
+    }
+
+    #endregion
+
+    #region Trees & Forest
 
     private void GenerateTrees()
     {
@@ -306,38 +391,159 @@ public class LandscapeGenerator : MonoBehaviour
         return forestHeight;
     }
 
-    private float GenerateMountainousTerrain(int x, int z)
+    #endregion
+
+    #region riverGeneration
+    private void GenerateRiver()
     {
-        // Calculate the position in the noise field
-        float sampleX = (float)x / xSize;
-        float sampleZ = (float)z / zSize;
+        // Generate the path of the river using an algorithm
+        List<Vector3> riverPath = GenerateRiverPath();
 
-        float height = 0;
-        float amplitude = 1;
-        float frequency = 1;
+        // Create a depression in the terrain for the riverbed
+        ModifyTerrainForRiver(riverPath);
 
-        for (int i = 0; i < octaves; i++)
+        // Create a river mesh along the river path
+        CreateRiverMesh(riverPath);
+    }
+
+    private List<Vector3> GenerateRiverPath()
+    {
+        List<Vector3> riverPath = new List<Vector3>();
+
+        // Find a starting point for the river
+        Vector3 startPoint = FindRiverStartPoint();
+
+        // Find the nearest ocean biome point to the starting point
+        Vector3 endPoint = FindNearestOceanPoint(startPoint);
+
+        // Sample points between the start and end to create a smooth path
+        int numPoints = 100; // Adjust as needed
+        for (int i = 0; i < numPoints; i++)
         {
-            amplitude *= persistence;
-            frequency *= lacunarity;
+            float t = i / (float)(numPoints - 1);
+            Vector3 point = Vector3.Lerp(startPoint, endPoint, t);
 
-            float noiseValue = Mathf.PerlinNoise(sampleX * frequency, sampleZ * frequency);
+            // Apply Perlin noise to create a winding river path
+            float perlinX = point.x * 0.1f;
+            float perlinZ = point.z * 0.1f;
+            float yOffset = riverStartDepth * Mathf.PerlinNoise(perlinX, perlinZ);
 
-            // Calculate ridged multifractal noise
-            float ridgeValue = Mathf.Abs(2 * Mathf.PerlinNoise(sampleX * frequency, sampleZ * frequency) - 1);
+            point.y = yOffset;
 
-            // Apply the ridgeValue to accentuate peaks
-            height += ridgeValue + noiseValue * amplitude;
+            riverPath.Add(point);
+
+            // Set the biome along the river path to "River"
+            int xIndex = Mathf.FloorToInt(point.x);
+            int zIndex = Mathf.FloorToInt(point.z);
+            if (xIndex >= 0 && xIndex <= xSize && zIndex >= 0 && zIndex <= zSize)
+            {
+                biomeMap[xIndex, zIndex] = BiomeType.River;
+            }
         }
-        return height + 2;
+
+        return riverPath;
     }
 
-    private float GenerateOceanTerrain(int x, int z)
+    private void ModifyTerrainForRiver(List<Vector3> riverPath)
     {
-        int oceanHeight = -1;
-        return oceanHeight;
+
     }
 
+    private void CreateRiverMesh(List<Vector3> riverPath)
+    {
+
+    }
+
+    private Vector3 FindRiverStartPoint()
+    {
+        Vector3 startRiverPoint = Vector3.zero;
+
+        while (true)
+        {
+            // Randomly select a point in the mountains
+            int x = Random.Range(0, xSize);
+            int z = Random.Range(0, zSize);
+
+            if (biomeMap[x, z] == BiomeType.Mountains && HasEnoughMountainBiomeNeighbors(x, z) && IsFarFromOtherRiverStarts(x, z))
+            {
+                startRiverPoint = new Vector3(x, 0, z);
+                break;
+            }
+        }
+
+        return startRiverPoint;
+    }
+    private bool HasEnoughMountainBiomeNeighbors(int x, int z)
+    {
+        int requiredMountainNeighbors = 8;
+
+        int mountainNeighbors = 0;
+
+        for (int dz = -1; dz <= 1; dz++)
+        {
+            for (int dx = -1; dx <= 1; dx++)
+            {
+                int neighborX = x + dx;
+                int neighborZ = z + dz;
+
+                // Ensure the neighbor is within bounds
+                if (neighborX >= 0 && neighborX < xSize && neighborZ >= 0 && neighborZ < zSize)
+                {
+                    if (biomeMap[neighborX, neighborZ] == BiomeType.Mountains)
+                    {
+                        mountainNeighbors++;
+                    }
+                }
+            }
+        }
+
+        return mountainNeighbors >= requiredMountainNeighbors;
+    }
+
+    private bool IsFarFromOtherRiverStarts(int x, int z)
+    {
+        float minDistance = 10f; // Minimum distance between river starts
+
+        foreach (var riverStart in riverStartPoints)
+        {
+            float distance = Vector3.Distance(new Vector3(x, 0, z), riverStart);
+            if (distance < minDistance)
+            {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    private Vector3 FindNearestOceanPoint(Vector3 startPoint)
+    {
+        Vector3 nearestPoint = Vector3.zero;
+        float nearestDistance = float.MaxValue;
+
+        for (int x = 0; x <= xSize; x++)
+        {
+            for (int z = 0; z <= zSize; z++)
+            {
+                if (biomeMap[x, z] == BiomeType.Ocean)
+                {
+                    Vector3 oceanPoint = new Vector3(x, 0, z);
+                    float distance = Vector3.Distance(startPoint, oceanPoint);
+
+                    if (distance < nearestDistance)
+                    {
+                        nearestDistance = distance;
+                        nearestPoint = oceanPoint;
+                    }
+                }
+            }
+        }
+
+        return nearestPoint;
+    }
+    #endregion
+
+    #region smoothing & coloring
     private void SmoothTerrainTransition()
     {
         for (int i = 0, z = 0; z <= zSize; z++)
@@ -388,47 +594,18 @@ public class LandscapeGenerator : MonoBehaviour
         mesh.RecalculateNormals();
         mesh.RecalculateTangents();
         collider.sharedMesh = mesh;
+        if (mountainCount > 100)
+        {
+            for (int m = 0; m <= mountainCount; m += 100)
+            {
+                GenerateRiver(); // Generate rivers
+                Debug.Log("making una riveare");
+            }
+        }
         ColorTerrain(); // Color the terrain after it has been generated.
         GenerateTrees(); // Generate trees.
     }
 
-    // Function to check if a point is near mountains
-    private bool IsNearBiome(int x, int z, BiomeType locationBiome)
-    {
-        // Define a range within which a point is considered near mountains
-        float Range = 3.0f; // Adjust this range as needed
-
-        // Check the biome type for the specified point
-        BiomeType biome = biomeMap[x, z];
-
-        // If the biome is Mountains or within the specified range of Mountains, return true
-        if (biome == locationBiome)
-        {
-            return true;
-        }
-
-        // Iterate through the entire terrain and find the closest mountain
-        float closestBiomeDistance = float.MaxValue;
-
-        for (int mx = 0; mx <= xSize; mx++)
-        {
-            for (int mz = 0; mz <= zSize; mz++)
-            {
-                if (biomeMap[mx, mz] == locationBiome)
-                {
-                    // Calculate the distance between the current point and the mountain
-                    float distance = Vector2.Distance(new Vector2(x, z), new Vector2(mx, mz));
-
-                    if (distance < closestBiomeDistance)
-                    {
-                        closestBiomeDistance = distance;
-                    }
-                }
-            }
-        }
-
-        return closestBiomeDistance <= Range;
-    }
 
     private void ColorTerrain()
     {
@@ -452,6 +629,7 @@ public class LandscapeGenerator : MonoBehaviour
 
         mesh.colors = colors;
     }
+#endregion
 
     private void OnDrawGizmos()
     {
