@@ -19,6 +19,7 @@ public class LandscapeGenerator : MonoBehaviour
     public LayerMask terrain;
     private int mountainCount;
     private List<Vector3> riverStartPoints = new List<Vector3>();
+    public Material riverMaterial;
 
     public enum BiomeType
     {
@@ -31,7 +32,7 @@ public class LandscapeGenerator : MonoBehaviour
 
     private BiomeType[,] biomeMap; // Define a 2D biome map
 
-    public float mountainScale = 15.0f, plainsScale = 2f, smoothingStrenght = 1f, transitionRange = 5.0f, persistence = 0.5f, lacunarity = 2.0f;
+    public float mountainScale = 15.0f, plainsScale = 2f, heightPlainsScale, smoothingStrenght = 1f, transitionRange = 5.0f, persistence = 0.5f, lacunarity = 2.0f;
     public int octaves = 5, neighbors = 3; // Number of octaves in the fractal noise                  
 
     private void Awake()
@@ -221,8 +222,8 @@ public class LandscapeGenerator : MonoBehaviour
     private float GeneratePlainsTerrain(int x, int z)
     {
         // Scale the coordinates to control the feature size
-        float xCoord = (float)x / xSize * plainsScale;
-        float zCoord = (float)z / zSize * plainsScale;
+        float xCoord = (float)x / xSize * heightPlainsScale;
+        float zCoord = (float)z / zSize * heightPlainsScale;
 
         // Use Perlin noise to generate terrain
         // Apply scaling and offset to the height
@@ -235,8 +236,8 @@ public class LandscapeGenerator : MonoBehaviour
     private float GenerateMountainousTerrain(int x, int z)
     {
         // Calculate the position in the noise field
-        float sampleX = (float)x / xSize;
-        float sampleZ = (float)z / zSize;
+        float sampleX = (float)x / xSize * 12;
+        float sampleZ = (float)z / zSize * 12;
 
         float height = baseHeight;
         float amplitude = 1;
@@ -247,7 +248,7 @@ public class LandscapeGenerator : MonoBehaviour
             amplitude = Mathf.Pow(persistence, i);
             frequency *= lacunarity;
 
-            float noiseValue = Mathf.PerlinNoise(sampleX * frequency, sampleZ * frequency);
+            float noiseValue = Mathf.PerlinNoise(sampleX, sampleZ);
 
             // Calculate ridged multifractal noise
             float ridgeValue = Mathf.Abs(2 * noiseValue - 1);
@@ -399,11 +400,8 @@ public class LandscapeGenerator : MonoBehaviour
         // Generate the path of the river using an algorithm
         List<Vector3> riverPath = GenerateRiverPath();
 
-        // Create a depression in the terrain for the riverbed
-        ModifyTerrainForRiver(riverPath);
-
         // Create a river mesh along the river path
-        CreateRiverMesh(riverPath);
+        GenerateRiverMesh(riverPath);
     }
 
     private List<Vector3> GenerateRiverPath()
@@ -413,45 +411,134 @@ public class LandscapeGenerator : MonoBehaviour
         // Find a starting point for the river
         Vector3 startPoint = FindRiverStartPoint();
 
+        // Add the new river start point to the list
+        riverStartPoints.Add(startPoint);
+
         // Find the nearest ocean biome point to the starting point
         Vector3 endPoint = FindNearestOceanPoint(startPoint);
 
-        // Sample points between the start and end to create a smooth path
+        // Set the initial direction toward the endpoint
+        Vector3 direction = (endPoint - startPoint).normalized;
+
+        // Sample points along the river path
         int numPoints = 100; // Adjust as needed
+        bool reachedOcean = false; // A flag to track if the river has reached an ocean
+
         for (int i = 0; i < numPoints; i++)
         {
-            float t = i / (float)(numPoints - 1);
-            Vector3 point = Vector3.Lerp(startPoint, endPoint, t);
+            // Check if the river has reached an ocean
+            if (reachedOcean)
+            {
+                break; // Exit the loop if the river has reached an ocean
+            }
 
-            // Apply Perlin noise to create a winding river path
-            float perlinX = point.x * 0.1f;
-            float perlinZ = point.z * 0.1f;
-            float yOffset = riverStartDepth * Mathf.PerlinNoise(perlinX, perlinZ);
+            // Calculate the next point based on the current position and direction
+            Vector3 currentPoint = riverPath.Count > 0 ? riverPath[riverPath.Count - 1] : startPoint;
+            Vector3 nextPoint = currentPoint + direction;
 
-            point.y = yOffset;
+            // Check if it's time to recheck the nearest ocean biome
+            if (i % 10 == 0)
+            {
+                endPoint = FindNearestOceanPoint(nextPoint);
+                direction = (endPoint - nextPoint).normalized;
+            }
 
-            riverPath.Add(point);
+            // Calculate the terrain height at the next point
+            float elevation = SampleTerrainHeight(nextPoint);
+
+            // If the elevation at the next point is lower than the current point, adjust the elevation
+            if (elevation < currentPoint.y)
+            {
+                // You can apply some smoothing to the change in elevation if needed
+                float newElevation = Mathf.Lerp(currentPoint.y, elevation, 0.1f); // Adjust the smoothing factor
+
+                nextPoint.y = newElevation;
+            }
 
             // Set the biome along the river path to "River"
-            int xIndex = Mathf.FloorToInt(point.x);
-            int zIndex = Mathf.FloorToInt(point.z);
+            int xIndex = Mathf.FloorToInt(nextPoint.x);
+            int zIndex = Mathf.FloorToInt(nextPoint.z);
             if (xIndex >= 0 && xIndex <= xSize && zIndex >= 0 && zIndex <= zSize)
             {
-                biomeMap[xIndex, zIndex] = BiomeType.River;
+                if (biomeMap[xIndex, zIndex] == BiomeType.Ocean)
+                {
+                    reachedOcean = true; // Set the flag to true
+                }
+
+                riverPath.Add(nextPoint);
+
+                // Set the biome along the river path to "River"
+                if (!reachedOcean)
+                {
+                    biomeMap[xIndex, zIndex] = BiomeType.River;
+                }
             }
         }
 
         return riverPath;
     }
-
-    private void ModifyTerrainForRiver(List<Vector3> riverPath)
+    private void GenerateRiverMesh(List<Vector3> riverPath)
     {
+        // Create a new GameObject to hold the river mesh
+        GameObject riverObject = new GameObject("River");
 
+        // Add a MeshFilter component to the river object
+        MeshFilter meshFilter = riverObject.AddComponent<MeshFilter>();
+
+        // Create a new Mesh for the river
+        Mesh riverMesh = new Mesh();
+
+        // Assign the vertices from the river path to the mesh
+        riverMesh.vertices = riverPath.ToArray();
+
+        // Create triangles to define the shape of the river
+        int numVertices = riverPath.Count;
+        int numTriangles = (numVertices - 2) * 3;
+        int[] triangles = new int[numTriangles];
+        int vertexIndex = 0;
+        for (int i = 0; i < numTriangles; i += 3)
+        {
+            triangles[i] = vertexIndex;
+            triangles[i + 1] = vertexIndex + 1;
+            triangles[i + 2] = vertexIndex + 2;
+            vertexIndex++;
+        }
+
+        Vector2[] uv = new Vector2[riverPath.Count];
+        for (int i = 0; i < riverPath.Count; i++)
+        {
+            uv[i] = new Vector2(riverPath[i].x, riverPath[i].z);
+        }
+        riverMesh.uv = uv;
+
+        riverMesh.triangles = triangles;
+
+        // Modify the terrain height along the river path
+        ModifyTerrainHeight(riverPath, riverMesh);
+
+        // Assign the river mesh to the MeshFilter
+        meshFilter.mesh = riverMesh;
+
+        // Create and assign a river material to the MeshRenderer component
+        MeshRenderer meshRenderer = riverObject.AddComponent<MeshRenderer>();
+        meshRenderer.name = "river";
+        meshRenderer.material = riverMaterial;
     }
-
-    private void CreateRiverMesh(List<Vector3> riverPath)
+    private void ModifyTerrainHeight(List<Vector3> riverPath, Mesh riverMesh)
     {
+        // Iterate through the river path and lower the terrain height
+        for (int i = 0; i < riverPath.Count; i++)
+        {
+            Vector3 riverPoint = riverPath[i];
+            float terrainHeight = SampleTerrainHeight(riverPoint);
 
+            // Lower the terrain height by the river depth
+            terrainHeight -= riverStartDepth;
+
+            // Update the river point's height in the mesh
+            mesh.vertices[i].y = terrainHeight;
+        }
+        RecalcTerrain();
     }
 
     private Vector3 FindRiverStartPoint()
@@ -591,15 +678,15 @@ public class LandscapeGenerator : MonoBehaviour
 
         // Update the mesh with the smoothed heights
         mesh.vertices = vertices;
-        mesh.RecalculateNormals();
-        mesh.RecalculateTangents();
+        RecalcTerrain();
         collider.sharedMesh = mesh;
         if (mountainCount > 100)
         {
+            if (mountainCount > 1000) mountainCount = 1000; // make sure we dont get an overload of rivers
             for (int m = 0; m <= mountainCount; m += 100)
             {
                 GenerateRiver(); // Generate rivers
-                Debug.Log("making una riveare");
+                Debug.Log("making a river");
             }
         }
         ColorTerrain(); // Color the terrain after it has been generated.
@@ -629,7 +716,13 @@ public class LandscapeGenerator : MonoBehaviour
 
         mesh.colors = colors;
     }
-#endregion
+
+    private void RecalcTerrain()
+    {
+        mesh.RecalculateNormals();
+        mesh.RecalculateTangents();
+    }
+    #endregion
 
     private void OnDrawGizmos()
     {
