@@ -410,11 +410,12 @@ MonoBehaviour:
   treeDensity: 0.3
   givenRadius: 0.2
   riverStartWidth: 5
-  riverStartDepth: 2
+  riverStartDepth: 1.5
   terrain:
     serializedVersion: 2
     m_Bits: 8
   riverMaterial: {fileID: 2100000, guid: 2b8ffa806e582144d98406781b9323ba, type: 2}
+  terrainMaterial: {fileID: 0}
   mountainScale: 6
   plainsScale: 2
   heightPlainsScale: 0
