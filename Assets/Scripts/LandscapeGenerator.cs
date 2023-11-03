@@ -600,13 +600,13 @@ public class LandscapeGenerator : MonoBehaviour
     }
     private bool HasEnoughMountainBiomeNeighbors(int x, int z)
     {
-        int requiredMountainNeighbors = 8;
+        int requiredMountainNeighbors = 16;
 
         int mountainNeighbors = 0;
 
-        for (int dz = -1; dz <= 1; dz++)
+        for (int dz = -2; dz <= 2; dz++)
         {
-            for (int dx = -1; dx <= 1; dx++)
+            for (int dx = -2; dx <= 2; dx++)
             {
                 int neighborX = x + dx;
                 int neighborZ = z + dz;
