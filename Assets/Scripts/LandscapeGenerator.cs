@@ -2,10 +2,19 @@ using System;
 using System.Collections.Generic;
 using UnityEngine;
 
+public enum BiomeType
+{
+    Plains,
+    Forest,
+    Mountains,
+    Ocean,
+    River
+}
+
 [RequireComponent(typeof(MeshFilter), typeof(MeshRenderer))]
 public class LandscapeGenerator : MonoBehaviour
 {
-    public int xSize, zSize;
+    public const int xSize = 100, zSize = xSize;
     private Vector3[] vertices;
     private Mesh mesh;
 #pragma warning disable CS0108 // Member hides inherited member; missing new keyword
@@ -20,23 +29,18 @@ public class LandscapeGenerator : MonoBehaviour
     private List<Vector3> riverStartPoints = new List<Vector3>();
     public Material riverMaterial, terrainMaterial;
     private Vector3[] initialVertices;
-
-    public enum BiomeType
-    {
-        Plains,
-        Forest,
-        Mountains,
-        Ocean,
-        River
-    }
+    private AStarPathmaker pathfinder;
 
     public static BiomeType[,] biomeMap; // Define a 2D biome map
+    public BiomeType[,] tileGrid = new BiomeType[xSize, zSize];
 
     public float mountainScale = 15.0f, plainsScale = 2f, heightPlainsScale, smoothingStrenght = 1f, transitionRange = 5.0f, persistence = 0.5f, lacunarity = 2.0f;
     public int octaves = 5, neighbors = 3; // Number of octaves in the fractal noise                  
 
     private void Awake()
     {
+        pathfinder = new AStarPathmaker(tileGrid);
+
         InitializeBiomeMap(); // Initialize the biome map  
     }
 
@@ -399,136 +403,14 @@ public class LandscapeGenerator : MonoBehaviour
     {
         Vector3 riverStart = FindRiverStartPoint();
         Vector3 riverGoal = FindNearestBiomePoint(riverStart, BiomeType.Ocean);
-        Debug.Log(riverStart);
-        Debug.Log(riverGoal);
-        // Generate the path of the river using an algorithm
-        List<Vector3> riverPath = FindPath(riverStart, riverGoal);
+        Debug.Log("riverStart: " + riverStart);
+        Debug.Log("riverGoal: " + riverGoal);
+
+        List < Vector3 > path = pathfinder.FindPath(riverStart, riverGoal);
+        Debug.Log("path: " + path.Count);
 
         // Create a river mesh along the river path
-        GenerateRiverMesh(riverPath, initialVertices);
-    }
-
-    public List<Vector3> FindPath(Vector3 startPosition, Vector3 targetPosition)
-    {
-        List<Vector3> path = new List<Vector3>();
-
-        int startXIndex = Mathf.FloorToInt(startPosition.x);
-        int startZIndex = Mathf.FloorToInt(startPosition.z);
-        int targetXIndex = Mathf.FloorToInt(targetPosition.x);
-        int targetZIndex = Mathf.FloorToInt(targetPosition.z);
-
-        if (startXIndex < 0 || startXIndex > xSize || startZIndex < 0 || startZIndex > zSize ||
-            targetXIndex < 0 || targetXIndex > xSize || targetZIndex < 0 || targetZIndex > zSize)
-        {
-            // Invalid start or target position
-            return path;
-        }
-
-        HashSet<Vector3> openSet = new HashSet<Vector3>();
-        HashSet<Vector3> closedSet = new HashSet<Vector3>();
-
-        openSet.Add(startPosition);
-
-        while (openSet.Count > 0)
-        {
-            Vector3 current = FindLowestF(openSet, targetPosition, startPosition);
-
-            openSet.Remove(current);
-            closedSet.Add(current);
-
-            if (current == targetPosition)
-            {
-                // Path found, reconstruct it
-                path = RetracePath(startPosition, targetPosition, vertices, xSize);
-                break;
-            }
-
-            foreach (Vector3 neighbor in GetNeighbors(current, vertices, xSize, zSize))
-            {
-                if (closedSet.Contains(neighbor))
-                    continue;
-
-                if (!openSet.Contains(neighbor))
-                    openSet.Add(neighbor);
-            }
-        }
-
-        return path;
-    }
-
-    private static Vector3 FindLowestF(HashSet<Vector3> openSet, Vector3 targetPosition, Vector3 startPosition)
-    {
-        Vector3 lowestF = Vector3.zero;
-        float lowestFCost = float.MaxValue;
-
-        foreach (Vector3 position in openSet)
-        {
-            float fCost = Fcost(position, targetPosition, startPosition);
-
-            if (fCost < lowestFCost)
-            {
-                lowestF = position;
-                lowestFCost = fCost;
-            }
-        }
-
-        return lowestF;
-    }
-
-    private static float Fcost(Vector3 position, Vector3 targetPosition, Vector3 startPosition)
-    {
-        // Replace this with your own heuristic function
-        return Vector3.Distance(position, targetPosition) + Gcost(position, startPosition);
-    }
-
-    private static float Gcost(Vector3 position, Vector3 startPosition)
-    {
-        // Calculate the cost to move from the start position to the current position
-        // This can be based on terrain cost or other factors
-        return Vector3.Distance(position, startPosition);
-    }
-
-    private static List<Vector3> GetNeighbors(Vector3 position, Vector3[] vertices, int xSize, int zSize)
-    {
-        List<Vector3> neighbors = new List<Vector3>();
-
-        int xIndex = Mathf.FloorToInt(position.x);
-        int zIndex = Mathf.FloorToInt(position.z);
-
-        // Check neighboring positions
-        for (int i = -1; i <= 1; i++)
-        {
-            for (int j = -1; j <= 1; j++)
-            {
-                int newX = xIndex + i;
-                int newZ = zIndex + j;
-
-                if (newX >= 0 && newX <= xSize && newZ >= 0 && newZ <= zSize)
-                {
-                    // Add the valid neighbor to the list
-                    neighbors.Add(vertices[newZ * (xSize + 1) + newX]);
-                }
-            }
-        }
-
-        return neighbors;
-    }
-
-    private static List<Vector3> RetracePath(Vector3 start, Vector3 end, Vector3[] vertices, int xSize)
-    {
-        List<Vector3> path = new List<Vector3>();
-        Vector3 current = end;
-
-        while (current != start)
-        {
-            path.Add(current);
-            int xIndex = Mathf.FloorToInt(current.x);
-            int zIndex = Mathf.FloorToInt(current.z);
-            current = vertices[zIndex * (xSize + 1) + xIndex];
-        }
-
-        path.Reverse();
-        return path;
+        GenerateRiverMesh(path, initialVertices);
     }
 
     private void GenerateRiverMesh(List<Vector3> riverPath, Vector3[] initialVertices)
@@ -548,9 +430,12 @@ public class LandscapeGenerator : MonoBehaviour
         // Create a list to store the river triangles
         List<int> triangles = new List<int>();
 
+        Debug.Log("path: " + riverPath.Count);
+
         // Loop through the vertices in the river path
         for (int i = 0; i < riverPath.Count - 1; i++)
         {
+            Debug.Log("path: " + riverPath[i]);
             int vertexIndex1 = Array.IndexOf(initialVertices, riverPath[i]);
             int vertexIndex2 = Array.IndexOf(initialVertices, riverPath[i + 1]);
 
@@ -651,7 +536,7 @@ public class LandscapeGenerator : MonoBehaviour
             int z = UnityEngine.Random.Range(0, zSize);
             if (biomeMap[x, z] == BiomeType.Mountains && HasEnoughMountainBiomeNeighbors(x, z) && IsFarFromOtherRiverStarts(x, z))
             {
-                startRiverPoint = new Vector3(x, 0, z);
+                startRiverPoint = new Vector3(x, SampleTerrainHeight(new Vector2(x,z)), z);
                 break;
             }
         }
@@ -738,13 +623,10 @@ public class LandscapeGenerator : MonoBehaviour
             if (mountainCount > 1000) mountainCount = 1000; // make sure we dont get an overload of rivers
             for (int m = 0; m <= mountainCount; m += 100)
             {
-                
-               
+                Debug.Log("making a river");
+                GenerateRiver(); // Generate rivers
             }
         }
-
-        Debug.Log("making a river");
-        GenerateRiver(); // Generate rivers
 
         for (int i = 0, z = 0; z <= zSize; z++)
         {
