@@ -1,20 +1,13 @@
 using System;
+using System.Collections;
 using System.Collections.Generic;
+using UnityEditor;
 using UnityEngine;
-
-public enum BiomeType
-{
-    Plains,
-    Forest,
-    Mountains,
-    Ocean,
-    River
-}
 
 [RequireComponent(typeof(MeshFilter), typeof(MeshRenderer))]
 public class LandscapeGenerator : MonoBehaviour
 {
-    public const int xSize = 100, zSize = xSize;
+    public int xSize, zSize;
     private Vector3[] vertices;
     private Mesh mesh;
 #pragma warning disable CS0108 // Member hides inherited member; missing new keyword
@@ -29,18 +22,23 @@ public class LandscapeGenerator : MonoBehaviour
     private List<Vector3> riverStartPoints = new List<Vector3>();
     public Material riverMaterial, terrainMaterial;
     private Vector3[] initialVertices;
-    private AStarPathmaker pathfinder;
 
-    public static BiomeType[,] biomeMap; // Define a 2D biome map
-    public BiomeType[,] tileGrid = new BiomeType[xSize, zSize];
+    public enum BiomeType
+    {
+        Plains,
+        Forest,
+        Mountains,
+        Ocean,
+        River
+    }
+
+    private BiomeType[,] biomeMap; // Define a 2D biome map
 
     public float mountainScale = 15.0f, plainsScale = 2f, heightPlainsScale, smoothingStrenght = 1f, transitionRange = 5.0f, persistence = 0.5f, lacunarity = 2.0f;
     public int octaves = 5, neighbors = 3; // Number of octaves in the fractal noise                  
 
     private void Awake()
     {
-        pathfinder = new AStarPathmaker(tileGrid);
-
         InitializeBiomeMap(); // Initialize the biome map  
     }
 
@@ -401,18 +399,77 @@ public class LandscapeGenerator : MonoBehaviour
     #region riverGeneration
     private void GenerateRiver()
     {
-        Vector3 riverStart = FindRiverStartPoint();
-        Vector3 riverGoal = FindNearestBiomePoint(riverStart, BiomeType.Ocean);
-        Debug.Log("riverStart: " + riverStart);
-        Debug.Log("riverGoal: " + riverGoal);
-
-        List < Vector3 > path = pathfinder.FindPath(riverStart, riverGoal);
-        Debug.Log("path: " + path.Count);
+        // Generate the path of the river using an algorithm
+        List<Vector3> riverPath = GenerateRiverPath();
 
         // Create a river mesh along the river path
-        GenerateRiverMesh(path, initialVertices);
+        GenerateRiverMesh(riverPath, initialVertices);
     }
 
+    private List<Vector3> GenerateRiverPath()
+    {
+        List<Vector3> riverPath = new List<Vector3>();
+
+        // Find a starting point for the river
+        Vector3 startPoint = FindRiverStartPoint();
+
+        // Add the new river start point to the list
+        riverStartPoints.Add(startPoint);
+
+        // Find the nearest ocean biome point to the starting point
+        Vector3 endPoint = FindNearestOceanPoint(startPoint);
+
+        // Set the initial direction toward the endpoint
+        Vector3 direction = (endPoint - startPoint).normalized;
+
+        // Sample points along the river path
+        int numPoints = 100; // Adjust as needed
+        bool reachedOcean = false; // A flag to track if the river has reached an ocean
+
+        for (int i = 0; i < numPoints; i++)
+        {
+            // Check if the river has reached an ocean
+            if (reachedOcean)
+            {
+                break; // Exit the loop if the river has reached an ocean
+            }
+
+            // Calculate the next point based on the current position and direction
+            Vector3 currentPoint = riverPath.Count > 0 ? riverPath[riverPath.Count - 1] : startPoint;
+            Vector3 nextPoint = currentPoint + direction;
+
+            // Check if it's time to recheck the nearest ocean biome
+            if (i % 10 == 0)
+            {
+                endPoint = FindNearestOceanPoint(nextPoint);
+                direction = (endPoint - nextPoint).normalized;
+            }
+
+            // Calculate the terrain height at the next point
+            float elevation = SampleTerrainHeight(nextPoint);
+
+            // If the elevation at the next point is lower than the current point, adjust the elevation
+            if (elevation < currentPoint.y)
+            {
+                // You can apply some smoothing to the change in elevation if needed
+                float newElevation = Mathf.Lerp(currentPoint.y, elevation, 0.1f); // Adjust the smoothing factor
+
+                nextPoint.y = newElevation;
+            }
+
+            // Lower the terrain height by the river depth
+            int xIndex = Mathf.FloorToInt(nextPoint.x);
+            int zIndex = Mathf.FloorToInt(nextPoint.z);
+            if (biomeMap[xIndex, zIndex] == BiomeType.Ocean)
+            {
+                reachedOcean = true; // Set the flag to true
+            }
+            riverPath.Add(nextPoint);
+            biomeMap[xIndex, zIndex] = BiomeType.River;
+        }
+        return riverPath;
+
+    }
     private void GenerateRiverMesh(List<Vector3> riverPath, Vector3[] initialVertices)
     {
         // Create a new GameObject to hold the river mesh
@@ -430,12 +487,9 @@ public class LandscapeGenerator : MonoBehaviour
         // Create a list to store the river triangles
         List<int> triangles = new List<int>();
 
-        Debug.Log("path: " + riverPath.Count);
-
         // Loop through the vertices in the river path
         for (int i = 0; i < riverPath.Count - 1; i++)
         {
-            Debug.Log("path: " + riverPath[i]);
             int vertexIndex1 = Array.IndexOf(initialVertices, riverPath[i]);
             int vertexIndex2 = Array.IndexOf(initialVertices, riverPath[i + 1]);
 
@@ -483,7 +537,7 @@ public class LandscapeGenerator : MonoBehaviour
     }
     private void AdjustTerrainHeight(List<Vector3> riverPath)
     {
-        foreach (Vector3 riverPoint in riverPath)
+        /*foreach (Vector3 riverPoint in riverPath)
         {
 
             int xIndex = Mathf.FloorToInt(riverPoint.x);
@@ -495,33 +549,51 @@ public class LandscapeGenerator : MonoBehaviour
 
                 if (vertices[zIndex * (xSize + 1) + xIndex].y > -1)
                 {
+                    Debug.Log("reached biome indenticator");
                     if (biomeMap[xIndex, zIndex] == BiomeType.Mountains)
                     {
+                        Debug.Log("reached mountain");
                         // Increase the river depth as the terrain height increases
                         float riverDepth = Mathf.Max(0.0f, terrainHeight);
-                        vertices[zIndex * (xSize + 1) + xIndex].y -= riverDepth;
+                        Debug.Log("river depth: " + riverDepth);
+                        mesh.vertices[zIndex * (xSize + 1) + xIndex].y -= riverDepth;
                     }
                     else if (biomeMap[xIndex, zIndex] == BiomeType.Forest)
                     {
-                        vertices[zIndex * (xSize + 1) + xIndex].y -= 1.0f;
+                        Debug.Log("reached forest");
+                        mesh.vertices[zIndex * (xSize + 1) + xIndex].y -= 1.0f;
                     }
                     else if (biomeMap[xIndex, zIndex] == BiomeType.Plains)
                     {
-                        vertices[zIndex * (xSize + 1) + xIndex].y -= 0.5f;
-                    }
-                    else if (biomeMap[xIndex, zIndex] == BiomeType.River)
-                    {
-
+                        Debug.Log("reached plains");
+                        mesh.vertices[zIndex * (xSize + 1) + xIndex].y -= 0.5f;
                     }
                     else
                     {
-                        vertices[zIndex * (xSize + 1) + xIndex].y -= 0.2f;
+                        Debug.Log("reached last else");
+                        mesh.vertices[zIndex * (xSize + 1) + xIndex].y -= 0.2f;
                     }
                 }
                 biomeMap[xIndex, zIndex] = BiomeType.River;
             }
         }
         // Update the terrain mesh with the modified vertices       
+        RecalcTerrain();
+    */
+
+        // Iterate through the river path and lower the terrain height
+        for (int i = 0; i < riverPath.Count; i++)
+        {
+            Vector3 riverPoint = riverPath[i];
+            float terrainHeight = SampleTerrainHeight(riverPoint);
+
+            // Lower the terrain height by the river depth
+            terrainHeight -= riverStartDepth;
+
+            // Update the river point's height in the mesh
+            mesh.vertices[i].y = terrainHeight;
+
+        }
         RecalcTerrain();
     }
 
@@ -534,23 +606,25 @@ public class LandscapeGenerator : MonoBehaviour
             // Randomly select a point in the mountains
             int x = UnityEngine.Random.Range(0, xSize);
             int z = UnityEngine.Random.Range(0, zSize);
+
             if (biomeMap[x, z] == BiomeType.Mountains && HasEnoughMountainBiomeNeighbors(x, z) && IsFarFromOtherRiverStarts(x, z))
             {
-                startRiverPoint = new Vector3(x, SampleTerrainHeight(new Vector2(x,z)), z);
+                startRiverPoint = new Vector3(x, 0, z);
                 break;
             }
         }
+
         return startRiverPoint;
     }
     private bool HasEnoughMountainBiomeNeighbors(int x, int z)
     {
-        int requiredMountainNeighbors = 16;
+        int requiredMountainNeighbors = 8;
 
         int mountainNeighbors = 0;
 
-        for (int dz = -2; dz <= 2; dz++)
+        for (int dz = -1; dz <= 1; dz++)
         {
-            for (int dx = -2; dx <= 2; dx++)
+            for (int dx = -1; dx <= 1; dx++)
             {
                 int neighborX = x + dx;
                 int neighborZ = z + dz;
@@ -565,6 +639,7 @@ public class LandscapeGenerator : MonoBehaviour
                 }
             }
         }
+
         return mountainNeighbors >= requiredMountainNeighbors;
     }
 
@@ -584,7 +659,7 @@ public class LandscapeGenerator : MonoBehaviour
         return true;
     }
 
-    private Vector3 FindNearestBiomePoint(Vector3 startGridPoint, BiomeType biome)
+    private Vector3 FindNearestOceanPoint(Vector3 startPoint)
     {
         Vector3 nearestPoint = Vector3.zero;
         float nearestDistance = float.MaxValue;
@@ -593,15 +668,15 @@ public class LandscapeGenerator : MonoBehaviour
         {
             for (int z = 0; z <= zSize; z++)
             {
-                if (biomeMap[x, z] == biome)
+                if (biomeMap[x, z] == BiomeType.Ocean)
                 {
-                    Vector3 biomePoint = new Vector3(x, vertices[z * (xSize + 1) + x].y, z);
-                    float distance = Vector3.Distance(startGridPoint, biomePoint);
+                    Vector3 oceanPoint = new Vector3(x, 0, z);
+                    float distance = Vector3.Distance(startPoint, oceanPoint);
 
                     if (distance < nearestDistance)
                     {
                         nearestDistance = distance;
-                        nearestPoint = biomePoint;
+                        nearestPoint = oceanPoint;
                     }
                 }
             }
@@ -609,7 +684,6 @@ public class LandscapeGenerator : MonoBehaviour
 
         return nearestPoint;
     }
-
     #endregion
 
     #region smoothing & coloring
@@ -623,8 +697,8 @@ public class LandscapeGenerator : MonoBehaviour
             if (mountainCount > 1000) mountainCount = 1000; // make sure we dont get an overload of rivers
             for (int m = 0; m <= mountainCount; m += 100)
             {
-                Debug.Log("making a river");
                 GenerateRiver(); // Generate rivers
+                Debug.Log("making a river");
             }
         }
 
@@ -673,6 +747,8 @@ public class LandscapeGenerator : MonoBehaviour
 
         // Update the mesh with the smoothed heights
         RecalcTerrain();
+
+
         ColorTerrain(); // Color the terrain after it has been generated.
         GenerateTrees(); // Generate trees.
     }
