@@ -399,6 +399,8 @@ public class LandscapeGenerator : MonoBehaviour
     {
         Vector3 riverStart = FindRiverStartPoint();
         Vector3 riverGoal = FindNearestBiomePoint(riverStart, BiomeType.Ocean);
+        Debug.Log(riverStart);
+        Debug.Log(riverGoal);
         // Generate the path of the river using an algorithm
         List<Vector3> riverPath = FindPath(riverStart, riverGoal);
 
@@ -406,125 +408,127 @@ public class LandscapeGenerator : MonoBehaviour
         GenerateRiverMesh(riverPath, initialVertices);
     }
 
-    public List<Vector3> FindPath(Vector3 startPosition, Vector3 endPosition)
+    public List<Vector3> FindPath(Vector3 startPosition, Vector3 targetPosition)
     {
-        int xStart = Mathf.FloorToInt(startPosition.x);
-        int zStart = Mathf.FloorToInt(startPosition.z);
-        int xEnd = Mathf.FloorToInt(endPosition.x);
-        int zEnd = Mathf.FloorToInt(endPosition.z);
+        List<Vector3> path = new List<Vector3>();
 
-        if (xStart < 0 || xStart > xSize || zStart < 0 || zStart > zSize)
+        int startXIndex = Mathf.FloorToInt(startPosition.x);
+        int startZIndex = Mathf.FloorToInt(startPosition.z);
+        int targetXIndex = Mathf.FloorToInt(targetPosition.x);
+        int targetZIndex = Mathf.FloorToInt(targetPosition.z);
+
+        if (startXIndex < 0 || startXIndex > xSize || startZIndex < 0 || startZIndex > zSize ||
+            targetXIndex < 0 || targetXIndex > xSize || targetZIndex < 0 || targetZIndex > zSize)
         {
-            // Start position is out of bounds.
-            Debug.Log("start out of bounds");
-            return null;
+            // Invalid start or target position
+            return path;
         }
 
-        if (xEnd < 0 || xEnd > xSize || zEnd < 0 || zEnd > zSize)
+        HashSet<Vector3> openSet = new HashSet<Vector3>();
+        HashSet<Vector3> closedSet = new HashSet<Vector3>();
+
+        openSet.Add(startPosition);
+
+        while (openSet.Count > 0)
         {
-            // End position is out of bounds.
-            Debug.Log("end out of bounds");
-            return null;
+            Vector3 current = FindLowestF(openSet, targetPosition, startPosition);
+
+            openSet.Remove(current);
+            closedSet.Add(current);
+
+            if (current == targetPosition)
+            {
+                // Path found, reconstruct it
+                path = RetracePath(startPosition, targetPosition, vertices, xSize);
+                break;
+            }
+
+            foreach (Vector3 neighbor in GetNeighbors(current, vertices, xSize, zSize))
+            {
+                if (closedSet.Contains(neighbor))
+                    continue;
+
+                if (!openSet.Contains(neighbor))
+                    openSet.Add(neighbor);
+            }
         }
 
-        List<Vector3> openList = new List<Vector3>();
-        List<Vector3> closedList = new List<Vector3>();
-
-        openList.Add(startPosition);
-
-        while (openList.Count > 0)
-        {
-            Debug.Log("in the while loop.");
-            Vector3 currentNode = openList[0];
-
-            for (int i = 1; i < openList.Count; i++)
-            {
-                if (CalculateFCost(openList[i], endPosition) < CalculateFCost(currentNode, endPosition))
-                {
-                    Debug.Log("current node");
-                    currentNode = openList[i];;
-                }
-            }
-
-            openList.Remove(currentNode);
-            closedList.Add(currentNode);
-
-            if (currentNode == endPosition)
-            {
-                Debug.Log("path found retracing");
-                return RetracePath(startPosition, endPosition, closedList);
-            }
-
-            int xCurrent = Mathf.FloorToInt(currentNode.x);
-            int zCurrent = Mathf.FloorToInt(currentNode.z);
-
-            for (int x = -1; x <= 1; x++)
-            {
-                for (int z = -1; z <= 1; z++)
-                {
-                    Debug.Log("checking neighbours");
-                    int xNeighbor = xCurrent + x;
-                    int zNeighbor = zCurrent + z;
-
-                    if (xNeighbor >= 0 && xNeighbor <= xSize && zNeighbor >= 0 && zNeighbor <= zSize)
-                    {
-                        Vector3 neighbor = vertices[zNeighbor * (xSize + 1) + xNeighbor];
-
-                        if (!closedList.Contains(neighbor))
-                        {
-                            if (!openList.Contains(neighbor))
-                            {
-                                openList.Add(neighbor);
-                                Debug.Log("neighbours found");                              
-                            }
-                        }
-                    }
-                }
-            }
-        }
-        Debug.Log("no path found");
-        // No path found
-        return null;
+        return path;
     }
 
-    static List<Vector3> RetracePath(Vector3 start, Vector3 end, List<Vector3> path)
+    private static Vector3 FindLowestF(HashSet<Vector3> openSet, Vector3 targetPosition, Vector3 startPosition)
     {
-        List<Vector3> finalPath = new List<Vector3>();
-        Vector3 currentNode = end;
+        Vector3 lowestF = Vector3.zero;
+        float lowestFCost = float.MaxValue;
 
-        while (currentNode != start)
+        foreach (Vector3 position in openSet)
         {
-            finalPath.Add(currentNode);
-            int xCurrent = Mathf.FloorToInt(currentNode.x);
-            int zCurrent = Mathf.FloorToInt(currentNode.z);
-            bool neighborFound = false;
+            float fCost = Fcost(position, targetPosition, startPosition);
 
-            for (int x = -1; x <= 1 && !neighborFound; x++)
+            if (fCost < lowestFCost)
             {
-                for (int z = -1; z <= 1 && !neighborFound; z++)
-                {
-                    int xNeighbor = xCurrent + x;
-                    int zNeighbor = zCurrent + z;
-                    Vector3 neighbor = new Vector3(xNeighbor, 0, zNeighbor);
+                lowestF = position;
+                lowestFCost = fCost;
+            }
+        }
 
-                    if (path.Contains(neighbor) && CalculateFCost(neighbor, end) == CalculateFCost(currentNode, end) - 1)
-                    {
-                        currentNode = neighbor;
-                        neighborFound = true;
-                    }
+        return lowestF;
+    }
+
+    private static float Fcost(Vector3 position, Vector3 targetPosition, Vector3 startPosition)
+    {
+        // Replace this with your own heuristic function
+        return Vector3.Distance(position, targetPosition) + Gcost(position, startPosition);
+    }
+
+    private static float Gcost(Vector3 position, Vector3 startPosition)
+    {
+        // Calculate the cost to move from the start position to the current position
+        // This can be based on terrain cost or other factors
+        return Vector3.Distance(position, startPosition);
+    }
+
+    private static List<Vector3> GetNeighbors(Vector3 position, Vector3[] vertices, int xSize, int zSize)
+    {
+        List<Vector3> neighbors = new List<Vector3>();
+
+        int xIndex = Mathf.FloorToInt(position.x);
+        int zIndex = Mathf.FloorToInt(position.z);
+
+        // Check neighboring positions
+        for (int i = -1; i <= 1; i++)
+        {
+            for (int j = -1; j <= 1; j++)
+            {
+                int newX = xIndex + i;
+                int newZ = zIndex + j;
+
+                if (newX >= 0 && newX <= xSize && newZ >= 0 && newZ <= zSize)
+                {
+                    // Add the valid neighbor to the list
+                    neighbors.Add(vertices[newZ * (xSize + 1) + newX]);
                 }
             }
         }
 
-        finalPath.Reverse();
-        return finalPath;
+        return neighbors;
     }
 
-    static float CalculateFCost(Vector3 position, Vector3 endPosition)
+    private static List<Vector3> RetracePath(Vector3 start, Vector3 end, Vector3[] vertices, int xSize)
     {
-        float gCost = Vector3.Distance(position, endPosition);
-        float hCost = Mathf.Abs(position.x - endPosition.x) + Mathf.Abs(position.z - endPosition.z);
-        return gCost + hCost;
+        List<Vector3> path = new List<Vector3>();
+        Vector3 current = end;
+
+        while (current != start)
+        {
+            path.Add(current);
+            int xIndex = Mathf.FloorToInt(current.x);
+            int zIndex = Mathf.FloorToInt(current.z);
+            current = vertices[zIndex * (xSize + 1) + xIndex];
+        }
+
+        path.Reverse();
+        return path;
     }
 
     private void GenerateRiverMesh(List<Vector3> riverPath, Vector3[] initialVertices)
@@ -640,17 +644,15 @@ public class LandscapeGenerator : MonoBehaviour
     {
         Vector3 startRiverPoint = Vector3.zero;
 
-        // Iterate through your landscape data (e.g., biomeMap) to find a suitable starting point
-        for (int x = 0; x < xSize; x++)
+        while (true)
         {
-            for (int z = 0; z < zSize; z++)
+            // Randomly select a point in the mountains
+            int x = UnityEngine.Random.Range(0, xSize);
+            int z = UnityEngine.Random.Range(0, zSize);
+            if (biomeMap[x, z] == BiomeType.Mountains && HasEnoughMountainBiomeNeighbors(x, z) && IsFarFromOtherRiverStarts(x, z))
             {
-                // Check if this location is suitable for a river start based on your rules
-                if (biomeMap[x, z] == BiomeType.Mountains && HasEnoughMountainBiomeNeighbors(x, z) && IsFarFromOtherRiverStarts(x, z))
-                {
-                    startRiverPoint = new Vector3(x, z);
-                    return startRiverPoint;
-                }
+                startRiverPoint = new Vector3(x, 0, z);
+                break;
             }
         }
         return startRiverPoint;
@@ -699,7 +701,7 @@ public class LandscapeGenerator : MonoBehaviour
 
     private Vector3 FindNearestBiomePoint(Vector3 startGridPoint, BiomeType biome)
     {
-        Vector3 nearestGridPoint = Vector3.zero;
+        Vector3 nearestPoint = Vector3.zero;
         float nearestDistance = float.MaxValue;
 
         for (int x = 0; x <= xSize; x++)
@@ -708,19 +710,19 @@ public class LandscapeGenerator : MonoBehaviour
             {
                 if (biomeMap[x, z] == biome)
                 {
-                    Vector3 biomeGridPoint = new Vector3(x, z);
-                    float distance = Vector3.Distance(startGridPoint, biomeGridPoint);
+                    Vector3 biomePoint = new Vector3(x, vertices[z * (xSize + 1) + x].y, z);
+                    float distance = Vector3.Distance(startGridPoint, biomePoint);
 
                     if (distance < nearestDistance)
                     {
                         nearestDistance = distance;
-                        nearestGridPoint = biomeGridPoint;
+                        nearestPoint = biomePoint;
                     }
                 }
             }
         }
 
-        return nearestGridPoint;
+        return nearestPoint;
     }
 
     #endregion
@@ -736,10 +738,13 @@ public class LandscapeGenerator : MonoBehaviour
             if (mountainCount > 1000) mountainCount = 1000; // make sure we dont get an overload of rivers
             for (int m = 0; m <= mountainCount; m += 100)
             {
-                GenerateRiver(); // Generate rivers
-                Debug.Log("making a river");
+                
+               
             }
         }
+
+        Debug.Log("making a river");
+        GenerateRiver(); // Generate rivers
 
         for (int i = 0, z = 0; z <= zSize; z++)
         {
