@@ -460,7 +460,7 @@ public class LandscapeGenerator : MonoBehaviour
             // Lower the terrain height by the river depth
             int xIndex = Mathf.FloorToInt(nextPoint.x);
             int zIndex = Mathf.FloorToInt(nextPoint.z);
-            if (biomeMap[xIndex, zIndex] == BiomeType.Ocean)
+            if (biomeMap[xIndex, zIndex] == BiomeType.Ocean && (xIndex >= 0 && xIndex <= xSize && zIndex >= 0 && zIndex <= zSize))
             {
                 reachedOcean = true; // Set the flag to true
             }
@@ -537,7 +537,7 @@ public class LandscapeGenerator : MonoBehaviour
     }
     private void AdjustTerrainHeight(List<Vector3> riverPath)
     {
-        /*foreach (Vector3 riverPoint in riverPath)
+        foreach (Vector3 riverPoint in riverPath)
         {
 
             int xIndex = Mathf.FloorToInt(riverPoint.x);
@@ -549,51 +549,33 @@ public class LandscapeGenerator : MonoBehaviour
 
                 if (vertices[zIndex * (xSize + 1) + xIndex].y > -1)
                 {
-                    Debug.Log("reached biome indenticator");
                     if (biomeMap[xIndex, zIndex] == BiomeType.Mountains)
                     {
-                        Debug.Log("reached mountain");
                         // Increase the river depth as the terrain height increases
                         float riverDepth = Mathf.Max(0.0f, terrainHeight);
-                        Debug.Log("river depth: " + riverDepth);
-                        mesh.vertices[zIndex * (xSize + 1) + xIndex].y -= riverDepth;
+                        vertices[zIndex * (xSize + 1) + xIndex].y -= riverDepth;
                     }
                     else if (biomeMap[xIndex, zIndex] == BiomeType.Forest)
                     {
-                        Debug.Log("reached forest");
-                        mesh.vertices[zIndex * (xSize + 1) + xIndex].y -= 1.0f;
+                        vertices[zIndex * (xSize + 1) + xIndex].y -= 1.0f;
                     }
                     else if (biomeMap[xIndex, zIndex] == BiomeType.Plains)
                     {
-                        Debug.Log("reached plains");
-                        mesh.vertices[zIndex * (xSize + 1) + xIndex].y -= 0.5f;
+                        vertices[zIndex * (xSize + 1) + xIndex].y -= 0.5f;
+                    }
+                    else if (biomeMap[xIndex, zIndex] == BiomeType.River)
+                    {
+
                     }
                     else
                     {
-                        Debug.Log("reached last else");
-                        mesh.vertices[zIndex * (xSize + 1) + xIndex].y -= 0.2f;
+                        vertices[zIndex * (xSize + 1) + xIndex].y -= 0.2f;
                     }
                 }
                 biomeMap[xIndex, zIndex] = BiomeType.River;
             }
         }
         // Update the terrain mesh with the modified vertices       
-        RecalcTerrain();
-    */
-
-        // Iterate through the river path and lower the terrain height
-        for (int i = 0; i < riverPath.Count; i++)
-        {
-            Vector3 riverPoint = riverPath[i];
-            float terrainHeight = SampleTerrainHeight(riverPoint);
-
-            // Lower the terrain height by the river depth
-            terrainHeight -= riverStartDepth;
-
-            // Update the river point's height in the mesh
-            mesh.vertices[i].y = terrainHeight;
-
-        }
         RecalcTerrain();
     }
 
