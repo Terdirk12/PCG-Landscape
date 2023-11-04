@@ -372,6 +372,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   xSize: 100
   zSize: 100
+  riverStartWidth: 1
   collider: {fileID: 1470579246}
   baseHeight: 0
   gradient:
@@ -409,13 +410,15 @@ MonoBehaviour:
   bushPrefab: {fileID: 4064818071302427170, guid: d99d9a8863727b2419a822af5d7ad2d6, type: 3}
   treeDensity: 0.3
   givenRadius: 0.2
-  riverStartWidth: 5
   riverStartDepth: 1.5
   terrain:
     serializedVersion: 2
     m_Bits: 8
   riverMaterial: {fileID: 2100000, guid: 2b8ffa806e582144d98406781b9323ba, type: 2}
   terrainMaterial: {fileID: 0}
+  minCurveAmt: 1
+  maxCurveAmt: 5
+  maxAngleModify: 1
   mountainScale: 6
   plainsScale: 2
   heightPlainsScale: 0
