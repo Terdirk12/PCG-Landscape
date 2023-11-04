@@ -416,6 +416,9 @@ public class LandscapeGenerator : MonoBehaviour
 
     private List<Vector3> GenerateRiverPath()
     {
+        // Create an empty set for visited points
+        HashSet<Vector3> visitedPoints = new HashSet<Vector3>();
+
         List<Vector3> riverPath = new List<Vector3>();
 
         // Find a starting point for the river
@@ -424,14 +427,8 @@ public class LandscapeGenerator : MonoBehaviour
         // Add the new river start point to the list
         riverStartPoints.Add(startPoint);
 
-        // Find the nearest ocean biome point to the starting point
-        Vector3 endPoint = FindNearestOceanPoint(startPoint);
-
-        // Set the initial direction toward the endpoint
-        Vector3 direction = (endPoint - startPoint).normalized;
-
         // Sample points along the river path
-        int numPoints = 100; // Adjust as needed
+        int numPoints = 200; // Adjust as needed
         bool reachedOcean = false; // A flag to track if the river has reached an ocean
 
         for (int i = 0; i < numPoints; i++)
@@ -444,28 +441,19 @@ public class LandscapeGenerator : MonoBehaviour
 
             // Calculate the next point based on the current position and direction
             Vector3 currentPoint = riverPath.Count > 0 ? riverPath[riverPath.Count - 1] : startPoint;
-            //Vector3 nextPoint = currentPoint + direction;
-            //Debug.Log("next point: " + nextPoint + " current pos: " + currentPoint + " direction: " + direction);
-
-            Vector3 nextPoint = FindNextPoint(currentPoint, direction);
-
-            // Check if it's time to recheck the nearest ocean biome
-            if (i % 10 == 0)
-            {
-                endPoint = FindNearestOceanPoint(nextPoint);
-                direction = (endPoint - nextPoint).normalized;
-            }
+            Vector3 nextPoint = FindNextPoint(currentPoint, visitedPoints);
 
             int xIndex = Mathf.FloorToInt(nextPoint.x);
             int zIndex = Mathf.FloorToInt(nextPoint.z);
-            if (biomeMap[xIndex, zIndex] == BiomeType.Ocean && (xIndex >= 0 && xIndex <= xSize && zIndex >= 0 && zIndex <= zSize))
+            if (biomeMap[xIndex, zIndex] == BiomeType.Ocean && IsWithinBounds(xIndex, zIndex))
             {
                 reachedOcean = true; // Set the flag to true
             }
             riverPath.Add(nextPoint);
-            Debug.Log("riverpath count: " + riverPath.Count);
             biomeMap[xIndex, zIndex] = BiomeType.River;
         }
+        // Clear the visited points set for the next river
+        visitedPoints.Clear();
         return riverPath;
 
     }
@@ -552,15 +540,15 @@ public class LandscapeGenerator : MonoBehaviour
                     {
                         // Increase the river depth as the terrain height increases
                         float riverDepth = Mathf.Max(0.0f, terrainHeight);
-                        vertices[zIndex * (xSize + 1) + xIndex].y -= riverDepth;
+                        vertices[zIndex * (xSize + 1) + xIndex].y -= 50;
                     }
                     else if (biomeMap[xIndex, zIndex] == BiomeType.Forest)
                     {
-                        vertices[zIndex * (xSize + 1) + xIndex].y -= 1.0f;
+                        vertices[zIndex * (xSize + 1) + xIndex].y -= 50;
                     }
                     else if (biomeMap[xIndex, zIndex] == BiomeType.Plains)
                     {
-                        vertices[zIndex * (xSize + 1) + xIndex].y -= 0.5f;
+                        vertices[zIndex * (xSize + 1) + xIndex].y -= 50f;
                     }
                     else if (biomeMap[xIndex, zIndex] == BiomeType.River)
                     {
@@ -568,7 +556,7 @@ public class LandscapeGenerator : MonoBehaviour
                     }
                     else
                     {
-                        vertices[zIndex * (xSize + 1) + xIndex].y -= 0.2f;
+                        vertices[zIndex * (xSize + 1) + xIndex].y -= 50;
                     }
                 }
                 biomeMap[xIndex, zIndex] = BiomeType.River;
@@ -666,32 +654,48 @@ public class LandscapeGenerator : MonoBehaviour
         return nearestPoint;
     }
 
-    Vector3 FindNextPoint(Vector3 currentPosition, Vector3 direction)
+    Vector3 FindNextPoint(Vector3 currentPosition, HashSet<Vector3> visitedPoints)
     {
+        // Find the nearest ocean biome point to the starting point
+        Vector3 endPoint = FindNearestOceanPoint(currentPosition);
+
+        // Set the initial direction toward the endpoint
+        Vector3 direction = (endPoint - currentPosition).normalized;
+
         Vector3 nextPoint = currentPosition + direction;
-        Debug.Log("next point: " + nextPoint + " current pos: " + currentPosition + " direction: " + direction);
 
         // Calculate the cost for the next point based on terrain type and height
         float nextPointCost = terrainMovementCosts[GetLocalBiome(nextPoint)] + CalculateHeightCost(nextPoint);
-        Debug.Log("next point cost: " + nextPointCost);
-
 
         // Check neighboring points and select the one with the lowest cost
         foreach (Vector3 neighbor in GetNeighbors(currentPosition))
         {
+            // Skip the current position itself
+            if (neighbor == currentPosition)
+            {
+                continue;
+            }
+
+            // Skip points that have already been visited in this river path
+            if (visitedPoints.Contains(neighbor))
+            {
+                continue;
+            }
+
             float neighborCost = terrainMovementCosts[GetLocalBiome(neighbor)] + CalculateHeightCost(neighbor);
 
             if (neighborCost < nextPointCost)
             {
-                Debug.Log("neighbor: " + neighbor + " neighbor cost: " + neighborCost + " amt of neighbours" + GetNeighbors(currentPosition).Count);
-                nextPoint = neighbor;
+                nextPoint = neighbor + direction;
                 nextPointCost = neighborCost;
             }
-        }
+            // Mark the selected point as visited
+            visitedPoints.Add(nextPoint);
+        } 
 
-        Debug.Log("next point after calculation: " + nextPoint);
         return nextPoint;
     }
+
     float CalculateHeightCost(Vector3 position)
     {
         return SampleTerrainHeight(position);
@@ -822,7 +826,7 @@ public class LandscapeGenerator : MonoBehaviour
     }
     bool IsWithinBounds(int x, int z)
     {
-        return x >= 0 && x < xSize && z >= 0 && z < zSize;
+        return x >= 0 && x <= xSize && z >= 0 && z <= zSize;
     }
 
     private void RecalcTerrain()
