@@ -400,6 +400,7 @@ public class LandscapeGenerator : MonoBehaviour
                         else if (treeHeight > 3f)
                         {
                             float R = UnityEngine.Random.Range(0, 2);
+                            treeHeight += UnityEngine.Random.Range(-0.05f, 0.05f);
                             if (R == 1) treeObject = Instantiate(lushtreePrefab, new Vector3(position.x, treeHeight, position.y), Quaternion.identity);
                             else treeObject = Instantiate(pinetreePrefab, new Vector3(position.x, treeHeight, position.y), Quaternion.identity);
                         }
