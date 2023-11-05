@@ -33,15 +33,21 @@ public class LandscapeGenerator : MonoBehaviour
         Plains,
         Forest,
         Mountains,
-        Ocean,
-        River
+        ShallowOcean,
+        DeepOcean,
+        River,
+        Beach,
+        Lowlands
     }
 
     Dictionary<BiomeType, float> terrainMovementCosts = new Dictionary<BiomeType, float>
 {
-    { BiomeType.Ocean, 0.0f },   // Low cost for ocean
+    { BiomeType.Beach, 0.0f },   // Low cost for beach
+    { BiomeType.ShallowOcean, 0.0f },   // Low cost for ocean
+    { BiomeType.DeepOcean, 0.0f },   // Low cost for ocean
     { BiomeType.River, 0.0f },   // Low cost for river
     { BiomeType.Plains, 1.0f },  // Default cost for plains
+    { BiomeType.Lowlands, 1.0f }, // Default cost for lowlands
     { BiomeType.Forest, 1.5f },  // Higher cost for forest
     { BiomeType.Mountains, 2.0f } // Even higher cost for mountains
 };
@@ -88,7 +94,7 @@ public class LandscapeGenerator : MonoBehaviour
                 // You can adjust these thresholds to determine the biome distribution
                 if (plainsNoise < 0.4f)
                 {
-                    biomeMap[x, z] = BiomeType.Ocean;
+                    biomeMap[x, z] = BiomeType.DeepOcean;
                 }
                 else if (plainsNoise < 0.6f)
                 {
@@ -123,6 +129,15 @@ public class LandscapeGenerator : MonoBehaviour
                 {
                     if (IsNearBiome(x, z, BiomeType.Mountains, 3)) biomeMap[x, z] = BiomeType.Forest;
                 }
+                if (biomeMap[x, z] != BiomeType.DeepOcean)
+                {
+                    if (IsNearBiome(x, z, BiomeType.DeepOcean, 3)) biomeMap[x, z] = BiomeType.Beach;
+                }
+                if (biomeMap[x, z] != BiomeType.Beach)
+                {
+                    if (IsNearBiome(x, z, BiomeType.Beach, 3) && IsNearBiome(x, z, BiomeType.DeepOcean, 3)) biomeMap[x, z] = BiomeType.ShallowOcean;
+                }
+
             }
         }
         GenerateTerrain();
@@ -134,12 +149,23 @@ public class LandscapeGenerator : MonoBehaviour
         {
             for (int z = 0; z <= zSize; z++)
             {
-                if (biomeMap[x, z] != BiomeType.River && biomeMap[x, z] != BiomeType.Ocean)
+                if (biomeMap[x, z] != BiomeType.DeepOcean && biomeMap[x, z] != BiomeType.ShallowOcean && biomeMap[x, z] != BiomeType.River)
                 {
-                    if (IsNearBiome(x, z, BiomeType.River, 3))
+                    if (biomeMap[x, z] == BiomeType.Mountains)
                     {
-                        biomeMap[x, z] = BiomeType.Plains;
-                        vertices[z * (xSize + 1) + x].y = GeneratePlainsTerrain(x, z);
+                        if (IsNearBiome(x, z, BiomeType.River, 3))
+                        {
+                            biomeMap[x, z] = BiomeType.Lowlands;
+                            vertices[z * (xSize + 1) + x].y = GenerateLowlandsTerrain(x, z);
+                        }
+                    }
+                    if (biomeMap[x, z] == BiomeType.Forest)
+                    {
+                        if (IsNearBiome(x, z, BiomeType.River, 1))
+                        {
+                            biomeMap[x, z] = BiomeType.Lowlands;
+                            vertices[z * (xSize + 1) + x].y = GenerateLowlandsTerrain(x, z);
+                        }
                     }
                 }
             }
@@ -172,6 +198,10 @@ public class LandscapeGenerator : MonoBehaviour
                         // Generate Plains terrain (you can define this function)
                         height = GeneratePlainsTerrain(x, z);
                         break;
+                    case BiomeType.Lowlands:
+                        // Generate Plains terrain (you can define this function)
+                        height = GenerateLowlandsTerrain(x, z);
+                        break;
                     case BiomeType.Forest:
                         // Generate Forest terrain
                         height = GenerateForestTerrain(x, z);
@@ -180,9 +210,17 @@ public class LandscapeGenerator : MonoBehaviour
                         // Generate Mountainous terrain
                         height = GenerateMountainousTerrain(x, z);
                         break;
-                    case BiomeType.Ocean:
-                        // Generate Mountainous terrain
-                        height = GenerateOceanTerrain(x, z);
+                    case BiomeType.DeepOcean:
+                        // Generate Ocean terrain
+                        height = GenerateDeepOceanTerrain(x, z);
+                        break;
+                    case BiomeType.ShallowOcean:
+                        // Generate Ocean terrain
+                        height = GenerateShallowOceanTerrain(x, z);
+                        break;
+                    case BiomeType.Beach:
+                        // Generate Beach terrain
+                        height = GenerateBeachTerrain(x, z);
                         break;
                 }
 
@@ -249,7 +287,7 @@ public class LandscapeGenerator : MonoBehaviour
 
     #endregion
 
-    #region Plains, Mountain & Ocean
+    #region Plains, Mountain, Ocean & Beach
     private float GeneratePlainsTerrain(int x, int z)
     {
         // Scale the coordinates to control the feature size
@@ -262,7 +300,18 @@ public class LandscapeGenerator : MonoBehaviour
 
         return plainsHeight;
     }
+    private float GenerateLowlandsTerrain(int x, int z)
+    {
+        // Scale the coordinates to control the feature size
+        float xCoord = (float)x / xSize * heightPlainsScale;
+        float zCoord = (float)z / zSize * heightPlainsScale;
 
+        // Use Perlin noise to generate terrain
+        // Apply scaling and offset to the height
+        float plainsHeight = (baseHeight - 0.35f) + Mathf.PerlinNoise(xCoord, zCoord);
+
+        return plainsHeight;
+    }
 
     private float GenerateMountainousTerrain(int x, int z)
     {
@@ -290,10 +339,22 @@ public class LandscapeGenerator : MonoBehaviour
         return height + 2;
     }
 
-    private float GenerateOceanTerrain(int x, int z)
+    private float GenerateDeepOceanTerrain(int x, int z)
     {
-        int oceanHeight = -1;
+        float oceanHeight = -1;
         return oceanHeight;
+    }
+
+    private float GenerateShallowOceanTerrain(int x, int z)
+    {
+        float oceanHeight = -0.25f;
+        return oceanHeight;
+    }
+
+    private float GenerateBeachTerrain(int x, int z)
+    {
+        float beachHeight = 0.15f;
+        return beachHeight;
     }
 
     #endregion
@@ -450,7 +511,7 @@ public class LandscapeGenerator : MonoBehaviour
         riverStartPoints.Add(startPoint);
 
         float curveAmt = UnityEngine.Random.Range(minCurveAmt, maxCurveAmt);
-        float distance = Vector3.Distance(startPoint, FindNearestBiomePoint(startPoint, BiomeType.Ocean));
+        float distance = Vector3.Distance(startPoint, FindNearestBiomePoint(startPoint, BiomeType.DeepOcean));
         float step = distance / curveAmt * MathF.PI * 2;
 
         // Sample points along the river path
@@ -465,7 +526,7 @@ public class LandscapeGenerator : MonoBehaviour
             }
 
             float angleModifier = MathF.Sin(step * i);
-            float angleModification = angleModifier * maxAngleModify;
+            float angleModification = angleModifier * (maxAngleModify * 1);
 
             // Calculate the next point based on the current position and direction
             Vector3 currentPoint = riverPath.Count > 0 ? riverPath[riverPath.Count - 1] : startPoint;
@@ -479,7 +540,7 @@ public class LandscapeGenerator : MonoBehaviour
                 continue;
             }
 
-            if (biomeMap[xIndex, zIndex] == BiomeType.Ocean)
+            if (biomeMap[xIndex, zIndex] == BiomeType.DeepOcean)
             {
                 reachedOcean = true; // Set the flag to true
             }
@@ -568,8 +629,6 @@ public class LandscapeGenerator : MonoBehaviour
                 // Expand the river to its neighbors based on river width
                 for (int i = -riverStartWidth; i <= riverStartWidth; i++)
                 {
-                    //for (int j = -riverStartWidth; j <= riverStartWidth; j++)
-                    //{
                     int neighborX = xIndex + i;
                     int neighborZ = zIndex;
 
@@ -579,7 +638,6 @@ public class LandscapeGenerator : MonoBehaviour
                         vertices[neighborZ * (xSize + 1) + neighborX].y = -1;
                         biomeMap[neighborX, neighborZ] = BiomeType.River;
                     }
-                    //}
                 }
                 biomeMap[xIndex, zIndex] = BiomeType.River;
             }
@@ -693,7 +751,7 @@ public class LandscapeGenerator : MonoBehaviour
     Vector3 FindNextPoint(Vector3 currentPosition, HashSet<Vector3> visitedPoints, float angle)
     {
         // Find the nearest ocean biome point to the starting point
-        Vector3 endOceanPoint = FindNearestBiomePoint(currentPosition, BiomeType.Ocean);
+        Vector3 endOceanPoint = FindNearestBiomePoint(currentPosition, BiomeType.DeepOcean);
         // Find the nearest ocean biome point to the starting point
         Vector3 nearestRiverPoint = FindNearestBiomePoint(currentPosition, BiomeType.River);
 
@@ -807,6 +865,7 @@ public class LandscapeGenerator : MonoBehaviour
         {
             for (int x = 0; x <= xSize; x++, i++)
             {
+
                 int vertexIndex = z * (xSize + 1) + x;
                 Vector3 vertexPosition = vertices[vertexIndex];
                 float vertexHeight = vertexPosition.y;
@@ -828,21 +887,36 @@ public class LandscapeGenerator : MonoBehaviour
                             int neighborIndex = neighborZ * (xSize + 1) + neighborX;
                             float neighborHeight = vertices[neighborIndex].y;
 
-                            // Check if the neighbor is within the transition range
-                            if (Mathf.Abs(neighborHeight - vertexHeight) <= transitionRange)
+                            if (biomeMap[x, z] == BiomeType.Beach)
                             {
-                                totalHeight += neighborHeight * smoothingStrenght;
-                                neighborCount++;
+                                // Check if the neighbor is within the transition range
+                                if (Mathf.Abs(neighborHeight - vertexHeight) <= 1)
+                                {
+                                    totalHeight += neighborHeight;
+                                    neighborCount++;
+                                }
                             }
+                            else
+                            {
+                                // Check if the neighbor is within the transition range
+                                if (Mathf.Abs(neighborHeight - vertexHeight) <= transitionRange)
+                                {
+                                    totalHeight += neighborHeight * smoothingStrenght;
+                                    neighborCount++;
+                                }
+                            }
+
+
                         }
+
                     }
+
+                    // Calculate the average height within the transition range
+                    float averageHeight = totalHeight / neighborCount;
+
+                    // Update the vertex height
+                    vertices[vertexIndex] = new Vector3(vertexPosition.x, averageHeight, vertexPosition.z);
                 }
-
-                // Calculate the average height within the transition range
-                float averageHeight = totalHeight / neighborCount;
-
-                // Update the vertex height
-                vertices[vertexIndex] = new Vector3(vertexPosition.x, averageHeight, vertexPosition.z);
             }
         }
 
@@ -859,26 +933,16 @@ public class LandscapeGenerator : MonoBehaviour
         int xIndex = Mathf.FloorToInt(pos.x);
         int zIndex = Mathf.FloorToInt(pos.z);
         if (IsWithinBounds(xIndex, zIndex)) return biomeMap[xIndex, zIndex];
-        return BiomeType.Ocean;
+        return BiomeType.DeepOcean;
     }
 
     private void ColorTerrain()
     {
         Color[] colors = new Color[vertices.Length];
 
-        float highestHeight = float.MinValue; // Initialize with a very low value
-
         for (int i = 0; i < vertices.Length; i++)
         {
-            if (vertices[i].y > highestHeight)
-            {
-                highestHeight = vertices[i].y;
-            }
-        }
-
-        for (int i = 0; i < vertices.Length; i++)
-        {
-            float colorHeight = Mathf.InverseLerp(0, highestHeight, vertices[i].y);
+            float colorHeight = Mathf.InverseLerp(-1, 10, vertices[i].y);
             colors[i] = gradient.Evaluate(colorHeight);
         }
 
@@ -932,8 +996,14 @@ public class LandscapeGenerator : MonoBehaviour
                     case BiomeType.Mountains:
                         Gizmos.color = Color.gray;
                         break;
-                    case BiomeType.Ocean:
+                    case BiomeType.DeepOcean:
                         Gizmos.color = Color.blue;
+                        break;
+                    case BiomeType.Beach:
+                        Gizmos.color = Color.yellow;
+                        break;
+                    case BiomeType.River:
+                        Gizmos.color = Color.cyan;
                         break;
                     default:
                         Gizmos.color = Color.white;
