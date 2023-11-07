@@ -7,26 +7,37 @@ using UnityEngine;
 [RequireComponent(typeof(MeshFilter), typeof(MeshRenderer))]
 public class LandscapeGenerator : MonoBehaviour
 {
-    public int xSize, zSize, riverStartWidth = 1;
     private Vector3[] vertices;
     private Mesh mesh;
 #pragma warning disable CS0108 // Member hides inherited member; missing new keyword
     public MeshCollider collider;
 #pragma warning restore CS0108 // Member hides inherited member; missing new keyword
-    public float baseHeight;
+    private float baseHeight = 0;
     public Gradient gradient;
     public GameObject pinetreePrefab, lushtreePrefab, bushPrefab; // Reference to your tree prefab
-    public float treeDensity = 0.3f, givenRadius = 0.5f, riverStartDepth = 0.5f; // Adjust the density of trees in the forest biome
     public LayerMask terrain;
     private int mountainCount;
     private List<Vector3> riverStartPoints = new List<Vector3>();
-    public Material riverMaterial, terrainMaterial;
-    private Vector3[] initialVertices;
     // Create an empty set for visited points
     HashSet<Vector3> visitedPoints = new HashSet<Vector3>();
     bool reachedOcean = false; // A flag to track if the river has reached an ocean
+    private BiomeType[,] biomeMap; // Define a 2D biome map
+    private float plainsScale = 2f, heightPlainsScale = 0, smoothingStrenght = 2f, transitionRange = 5.0f, persistence = 0.5f, lacunarity = 8f;
+    private int octaves = 10, neighbors = 5; // Number of octaves in the fractal noise        
 
+
+    [Range(50, 150)]
+    public int xSize, zSize;
+    [Range(0.15f, 0.2f)]
+    public float givenRadius = 0.15f;
+    [Range(0, 3)]
+    public int riverStartWidth = 1;
+    [Range(0.2f, 0.4f)]
+    public float treeDensity = 0.3f; // Adjust the density of trees in the forest biome
+    [Range(1, 5)]
     public float minCurveAmt, maxCurveAmt, maxAngleModify;
+    [Range(1, 10)]
+    public float mountainScale = 6;
 
     public enum BiomeType
     {
@@ -52,10 +63,7 @@ public class LandscapeGenerator : MonoBehaviour
     { BiomeType.Mountains, 2.0f } // Even higher cost for mountains
 };
 
-    private BiomeType[,] biomeMap; // Define a 2D biome map
 
-    public float mountainScale = 15.0f, plainsScale = 2f, heightPlainsScale, smoothingStrenght = 1f, transitionRange = 5.0f, persistence = 0.5f, lacunarity = 2.0f;
-    public int octaves = 5, neighbors = 3; // Number of octaves in the fractal noise                  
 
     private void Awake()
     {
@@ -390,42 +398,45 @@ public class LandscapeGenerator : MonoBehaviour
                     //float treeHeight = vertices[Mathf.FloorToInt(position.y) * (xSize + 1) + Mathf.FloorToInt(position.x)].y;
                     float treeHeight = SampleTerrainHeight(position);
                     GameObject treeObject; // The instantiated tree object
-                    if (treeHeight < 6.5f)
+                    if (treeHeight > 1f)
                     {
-                        if (treeHeight > 3.5f)
+                        if (treeHeight < 6.5f)
                         {
-                            treeHeight += UnityEngine.Random.Range(-0.05f, 0.05f);
-                            treeObject = Instantiate(pinetreePrefab, new Vector3(position.x, treeHeight, position.y), Quaternion.identity);
-                        }
-                        else if (treeHeight > 3f)
-                        {
-                            float R = UnityEngine.Random.Range(0, 2);
-                            treeHeight += UnityEngine.Random.Range(-0.05f, 0.05f);
-                            if (R == 1) treeObject = Instantiate(lushtreePrefab, new Vector3(position.x, treeHeight, position.y), Quaternion.identity);
-                            else treeObject = Instantiate(pinetreePrefab, new Vector3(position.x, treeHeight, position.y), Quaternion.identity);
-                        }
-                        else
-                        {
-                            treeHeight += UnityEngine.Random.Range(-0.05f, 0.05f);
-                            treeObject = Instantiate(lushtreePrefab, new Vector3(position.x, treeHeight, position.y), Quaternion.identity);
-                        }
+                            if (treeHeight > 3.5f)
+                            {
+                                treeHeight += UnityEngine.Random.Range(-0.05f, 0.05f);
+                                treeObject = Instantiate(pinetreePrefab, new Vector3(position.x, treeHeight, position.y), Quaternion.identity);
+                            }
+                            else if (treeHeight > 3f)
+                            {
+                                float R = UnityEngine.Random.Range(0, 2);
+                                treeHeight += UnityEngine.Random.Range(-0.05f, 0.05f);
+                                if (R == 1) treeObject = Instantiate(lushtreePrefab, new Vector3(position.x, treeHeight, position.y), Quaternion.identity);
+                                else treeObject = Instantiate(pinetreePrefab, new Vector3(position.x, treeHeight, position.y), Quaternion.identity);
+                            }
+                            else
+                            {
+                                treeHeight += UnityEngine.Random.Range(-0.05f, 0.05f);
+                                treeObject = Instantiate(lushtreePrefab, new Vector3(position.x, treeHeight, position.y), Quaternion.identity);
+                            }
 
-                        // Set the tree object as a child of the treeContainer
-                        treeObject.transform.parent = treeContainer.transform;
+                            // Set the tree object as a child of the treeContainer
+                            treeObject.transform.parent = treeContainer.transform;
+                        }
                     }
-                }
-                else
-                {
-                    float bushHeight = SampleTerrainHeight(position);
-                    GameObject bushObject; // The instantiated tree object
-                    if (bushHeight < 3.5f)
+                    else
                     {
+                        float bushHeight = SampleTerrainHeight(position);
+                        GameObject bushObject; // The instantiated tree object
+                        if (bushHeight < 3.5f)
+                        {
 
-                        float treeHeight = SampleTerrainHeight(position);
-                        bushObject = Instantiate(bushPrefab, new Vector3(position.x, treeHeight, position.y), Quaternion.identity);
+                            float treeHeight = SampleTerrainHeight(position);
+                            bushObject = Instantiate(bushPrefab, new Vector3(position.x, treeHeight, position.y), Quaternion.identity);
 
-                        // Set the bush object as a child of the treeContainer
-                        bushObject.transform.parent = treeContainer.transform;
+                            // Set the bush object as a child of the treeContainer
+                            bushObject.transform.parent = treeContainer.transform;
+                        }
                     }
                 }
             }
@@ -494,7 +505,7 @@ public class LandscapeGenerator : MonoBehaviour
         List<Vector3> riverPath = GenerateRiverPath();
 
         // Create a river mesh along the river path
-        GenerateRiverMesh(riverPath, initialVertices);
+        GenerateRiverMesh(riverPath);
 
         //make river banks
         MakeRiverBanks();
@@ -552,70 +563,10 @@ public class LandscapeGenerator : MonoBehaviour
         return riverPath;
 
     }
-    private void GenerateRiverMesh(List<Vector3> riverPath, Vector3[] initialVertices)
+    private void GenerateRiverMesh(List<Vector3> riverPath)
     {
-        // Create a new GameObject to hold the river mesh
-        GameObject riverObject = new GameObject("River");
-
-        // Add a MeshFilter component to the river object
-        MeshFilter meshFilter = riverObject.AddComponent<MeshFilter>();
-
-        // Create a new Mesh for the river
-        Mesh riverMesh = new Mesh();
-
-        // Use the initial landscape's vertices for the river mesh
-        riverMesh.vertices = initialVertices; // Use the initial landscape vertices
-
-        // Create a list to store the river triangles
-        List<int> triangles = new List<int>();
-
-        // Loop through the vertices in the river path
-        for (int i = 0; i < riverPath.Count - 1; i++)
-        {
-            int vertexIndex1 = Array.IndexOf(initialVertices, riverPath[i]);
-            int vertexIndex2 = Array.IndexOf(initialVertices, riverPath[i + 1]);
-
-            if (vertexIndex1 != -1 && vertexIndex2 != -1)
-            {
-                // Define triangles connecting river vertices to initial vertices
-                // Triangle 1
-                triangles.Add(vertexIndex1);
-                triangles.Add(vertexIndex1 + 1);
-                triangles.Add(vertexIndex2);
-
-                // Triangle 2
-                triangles.Add(vertexIndex2);
-                triangles.Add(vertexIndex1 + 1);
-                triangles.Add(vertexIndex2 + 1);
-            }
-        }
-
-        // Set the river mesh's triangles
-        riverMesh.triangles = triangles.ToArray();
-
-        // Calculate UVs for the river mesh
-        Vector2[] uvs = new Vector2[initialVertices.Length];
-        for (int i = 0; i < initialVertices.Length; i++)
-        {
-            // Calculate UV coordinates based on the vertex position
-            uvs[i] = new Vector2(initialVertices[i].x, initialVertices[i].z);
-        }
-        riverMesh.uv = uvs;
-
-        // Calculate normals for the river mesh
-        riverMesh.RecalculateNormals();
-        riverMesh.RecalculateTangents();
-
         // Modify the terrain height along the river path
         AdjustTerrainHeight(riverPath);
-
-        // Assign the river mesh to the MeshFilter
-        meshFilter.mesh = riverMesh;
-
-        // Create and assign a river material to the MeshRenderer component
-        MeshRenderer meshRenderer = riverObject.AddComponent<MeshRenderer>();
-        meshRenderer.name = "river";
-        meshRenderer.material = riverMaterial;
     }
     private void AdjustTerrainHeight(List<Vector3> riverPath)
     {
@@ -850,9 +801,6 @@ public class LandscapeGenerator : MonoBehaviour
     #region smoothing & coloring
     private void SmoothTerrainTransition()
     {
-        // Store the initial landscape vertices
-        initialVertices = vertices;
-
         if (mountainCount > 100)
         {
             if (mountainCount > 1000) mountainCount = 1000; // make sure we dont get an overload of rivers
