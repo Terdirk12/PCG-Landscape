@@ -407,8 +407,8 @@ MonoBehaviour:
   terrain:
     serializedVersion: 2
     m_Bits: 8
-  xSize: 150
-  zSize: 150
+  xSize: 100
+  zSize: 100
   givenRadius: 0.2
   riverStartWidth: 1
   treeDensity: 0.301

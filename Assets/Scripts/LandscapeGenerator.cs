@@ -22,9 +22,8 @@ public class LandscapeGenerator : MonoBehaviour
     HashSet<Vector3> visitedPoints = new HashSet<Vector3>();
     bool reachedOcean = false; // A flag to track if the river has reached an ocean
     private BiomeType[,] biomeMap; // Define a 2D biome map
-    private float plainsScale = 2f, heightPlainsScale = 0, smoothingStrenght = 2f, transitionRange = 5.0f, persistence = 0.5f, lacunarity = 8f;
+    private float plainsScale = 2f, heightPlainsScale = 0, smoothingStrenght = 2f, transitionRange = 5.0f, persistence = 0.5f, lacunarity = 8f, mountainScale = 6;
     private int octaves = 10, neighbors = 5; // Number of octaves in the fractal noise        
-
 
     [Range(50, 150)]
     public int xSize, zSize;
@@ -36,8 +35,6 @@ public class LandscapeGenerator : MonoBehaviour
     public float treeDensity = 0.3f; // Adjust the density of trees in the forest biome
     [Range(1, 5)]
     public float minCurveAmt, maxCurveAmt, maxAngleModify;
-    [Range(1, 10)]
-    public float mountainScale = 6;
 
     public enum BiomeType
     {
