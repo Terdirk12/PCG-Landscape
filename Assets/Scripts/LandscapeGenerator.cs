@@ -423,19 +423,20 @@ public class LandscapeGenerator : MonoBehaviour
                             // Set the tree object as a child of the treeContainer
                             treeObject.transform.parent = treeContainer.transform;
                         }
-                    }
-                    else
-                    {
-                        float bushHeight = SampleTerrainHeight(position);
-                        GameObject bushObject; // The instantiated tree object
-                        if (bushHeight < 3.5f)
+                        else
                         {
+                            float bushHeight = SampleTerrainHeight(position);
+                            GameObject bushObject; // The instantiated tree object
+                            if (bushHeight < 3.5f)
+                            {
 
-                            float treeHeight = SampleTerrainHeight(position);
-                            bushObject = Instantiate(bushPrefab, new Vector3(position.x, treeHeight, position.y), Quaternion.identity);
+                                
+                                treeHeight = SampleTerrainHeight(position);
+                                bushObject = Instantiate(bushPrefab, new Vector3(position.x, treeHeight, position.y), Quaternion.identity);
 
-                            // Set the bush object as a child of the treeContainer
-                            bushObject.transform.parent = treeContainer.transform;
+                                // Set the bush object as a child of the treeContainer
+                                bushObject.transform.parent = treeContainer.transform;
+                            }
                         }
                     }
                 }
