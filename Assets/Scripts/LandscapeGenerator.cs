@@ -12,8 +12,8 @@ public class LandscapeGenerator : MonoBehaviour
 #pragma warning disable CS0108 // Member hides inherited member; missing new keyword
     public MeshCollider collider;
 #pragma warning restore CS0108 // Member hides inherited member; missing new keyword
-    private float baseHeight = 0;
-    public Gradient gradient;
+    private float baseHeight = 0; 
+   
     public GameObject pinetreePrefab, lushtreePrefab, bushPrefab; // Reference to your tree prefab
     public LayerMask terrain;
     private int mountainCount;
@@ -25,6 +25,8 @@ public class LandscapeGenerator : MonoBehaviour
     private float plainsScale = 2f, heightPlainsScale = 0, smoothingStrenght = 2f, transitionRange = 5.0f, persistence = 0.5f, lacunarity = 8f, mountainScale = 6;
     private int octaves = 10, neighbors = 5; // Number of octaves in the fractal noise        
 
+    //these are all for the player to adapt
+    public Gradient gradient;
     [Range(50, 150)]
     public int xSize, zSize;
     [Range(0.15f, 0.2f)]
@@ -617,13 +619,13 @@ public class LandscapeGenerator : MonoBehaviour
     }
     private bool HasEnoughMountainBiomeNeighbors(int x, int z)
     {
-        int requiredMountainNeighbors = 16;
+        int requiredMountainNeighbors = 8;
 
         int mountainNeighbors = 0;
 
-        for (int dz = -2; dz <= 2; dz++)
+        for (int dz = -1; dz <= 1; dz++)
         {
-            for (int dx = -2; dx <= 2; dx++)
+            for (int dx = -1; dx <= 1; dx++)
             {
                 int neighborX = x + dx;
                 int neighborZ = z + dz;

@@ -415,7 +415,6 @@ MonoBehaviour:
   minCurveAmt: 1
   maxCurveAmt: 5
   maxAngleModify: 1
-  mountainScale: 6
 --- !u!23 &1470579244
 MeshRenderer:
   m_ObjectHideFlags: 0
