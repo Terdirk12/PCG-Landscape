@@ -371,6 +371,12 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   collider: {fileID: 1470579246}
+  pinetreePrefab: {fileID: 3120736601316317737, guid: 8c7de374443d22c438f0bbb817f1312f, type: 3}
+  lushtreePrefab: {fileID: 5213287632809392628, guid: 6b5da46f52943864599e90dd0f6ec82e, type: 3}
+  bushPrefab: {fileID: 4064818071302427170, guid: d99d9a8863727b2419a822af5d7ad2d6, type: 3}
+  terrain:
+    serializedVersion: 2
+    m_Bits: 8
   gradient:
     serializedVersion: 2
     key0: {r: 0.06666665, g: 0.24802636, b: 0.9607843, a: 1}
@@ -401,20 +407,14 @@ MonoBehaviour:
     m_ColorSpace: -1
     m_NumColorKeys: 8
     m_NumAlphaKeys: 3
-  pinetreePrefab: {fileID: 3120736601316317737, guid: 8c7de374443d22c438f0bbb817f1312f, type: 3}
-  lushtreePrefab: {fileID: 5213287632809392628, guid: 6b5da46f52943864599e90dd0f6ec82e, type: 3}
-  bushPrefab: {fileID: 4064818071302427170, guid: d99d9a8863727b2419a822af5d7ad2d6, type: 3}
-  terrain:
-    serializedVersion: 2
-    m_Bits: 8
-  xSize: 100
-  zSize: 100
+  xSize: 150
+  zSize: 150
   givenRadius: 0.2
   riverStartWidth: 1
   treeDensity: 0.301
   minCurveAmt: 1
   maxCurveAmt: 5
-  maxAngleModify: 1
+  maxAngleModify: 5
 --- !u!23 &1470579244
 MeshRenderer:
   m_ObjectHideFlags: 0
