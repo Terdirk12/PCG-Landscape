@@ -1,7 +1,5 @@
 using System;
-using System.Collections;
 using System.Collections.Generic;
-using UnityEditor;
 using UnityEngine;
 
 [RequireComponent(typeof(MeshFilter), typeof(MeshRenderer))]
@@ -12,18 +10,19 @@ public class LandscapeGenerator : MonoBehaviour
 #pragma warning disable CS0108 // Member hides inherited member; missing new keyword
     public MeshCollider collider;
 #pragma warning restore CS0108 // Member hides inherited member; missing new keyword
-    private float baseHeight = 0; 
-   
+    private readonly float baseHeight = 0;
+
     public GameObject pinetreePrefab, lushtreePrefab, bushPrefab; // Reference to your tree prefab
     public LayerMask terrain;
     private int mountainCount;
-    private List<Vector3> riverStartPoints = new List<Vector3>();
+    private readonly List<Vector3> riverStartPoints = new();
+
     // Create an empty set for visited points
-    HashSet<Vector3> visitedPoints = new HashSet<Vector3>();
-    bool reachedOcean = false; // A flag to track if the river has reached an ocean
+    private readonly HashSet<Vector3> visitedPoints = new();
+    private bool reachedOcean = false; // A flag to track if the river has reached an ocean
     private BiomeType[,] biomeMap; // Define a 2D biome map
-    private float plainsScale = 2f, heightPlainsScale = 0, smoothingStrenght = 2f, transitionRange = 5.0f, persistence = 0.5f, lacunarity = 8f, mountainScale = 6;
-    private int octaves = 10, neighbors = 5; // Number of octaves in the fractal noise        
+    private readonly float plainsScale = 2f, heightPlainsScale = 0, smoothingStrenght = 2f, transitionRange = 5.0f, persistence = 0.5f, lacunarity = 8f, mountainScale = 6;
+    private readonly int octaves = 10, neighbors = 5; // Number of octaves in the fractal noise        
 
     //these are all for the player to adapt
     public Gradient gradient;
@@ -50,8 +49,8 @@ public class LandscapeGenerator : MonoBehaviour
         Lowlands
     }
 
-    Dictionary<BiomeType, float> terrainMovementCosts = new Dictionary<BiomeType, float>
-{
+    private readonly Dictionary<BiomeType, float> terrainMovementCosts = new()
+    {
     { BiomeType.Beach, 0.0f },   // Low cost for beach
     { BiomeType.ShallowOcean, 0.0f },   // Low cost for ocean
     { BiomeType.DeepOcean, 0.0f },   // Low cost for ocean
@@ -156,7 +155,7 @@ public class LandscapeGenerator : MonoBehaviour
         {
             for (int z = 0; z <= zSize; z++)
             {
-                if (biomeMap[x, z] != BiomeType.DeepOcean && biomeMap[x, z] != BiomeType.ShallowOcean && biomeMap[x, z] != BiomeType.River)
+                if (biomeMap[x, z] is not BiomeType.DeepOcean and not BiomeType.ShallowOcean and not BiomeType.River)
                 {
                     if (biomeMap[x, z] == BiomeType.Mountains)
                     {
@@ -188,46 +187,47 @@ public class LandscapeGenerator : MonoBehaviour
         vertices = new Vector3[(xSize + 1) * (zSize + 1)];
         Vector2[] uv = new Vector2[vertices.Length];
         Vector4[] tangents = new Vector4[vertices.Length];
-        Vector4 tangent = new Vector4(1f, 0f, 0f, -1f);
+        Vector4 tangent = new(1f, 0f, 0f, -1f);
 
         // Generate terrain based on the biome
         float height = 0f;
-        for (int i = 0, z = 0; z <= zSize; z++)
+        int i = 0;
+        for (float z = 0; z <= zSize; z += 0.5f)
         {
-            for (int x = 0; x <= xSize; x++, i++)
+            for (float x = 0; x <= xSize; x += 0.5f, i++)
             {
                 // Get the biome type for this point
-                BiomeType biome = biomeMap[x, z];
+                BiomeType biome = biomeMap[(int)x, (int)z];
 
                 switch (biome)
                 {
                     case BiomeType.Plains:
                         // Generate Plains terrain (you can define this function)
-                        height = GeneratePlainsTerrain(x, z);
+                        height = GeneratePlainsTerrain((int)x, (int)z);
                         break;
                     case BiomeType.Lowlands:
                         // Generate Plains terrain (you can define this function)
-                        height = GenerateLowlandsTerrain(x, z);
+                        height = GenerateLowlandsTerrain((int)x, (int)z);
                         break;
                     case BiomeType.Forest:
                         // Generate Forest terrain
-                        height = GenerateForestTerrain(x, z);
+                        height = GenerateForestTerrain((int)x, (int)z);
                         break;
                     case BiomeType.Mountains:
                         // Generate Mountainous terrain
-                        height = GenerateMountainousTerrain(x, z);
+                        height = GenerateMountainousTerrain((int)x, (int)z);
                         break;
                     case BiomeType.DeepOcean:
                         // Generate Ocean terrain
-                        height = GenerateDeepOceanTerrain(x, z);
+                        height = GenerateDeepOceanTerrain((int)x, (int)z);
                         break;
                     case BiomeType.ShallowOcean:
                         // Generate Ocean terrain
-                        height = GenerateShallowOceanTerrain(x, z);
+                        height = GenerateShallowOceanTerrain((int)x, (int)z);
                         break;
                     case BiomeType.Beach:
                         // Generate Beach terrain
-                        height = GenerateBeachTerrain(x, z);
+                        height = GenerateBeachTerrain((int)x, (int)z);
                         break;
                 }
 
@@ -371,7 +371,7 @@ public class LandscapeGenerator : MonoBehaviour
     private void GenerateTrees()
     {
         // Create an empty GameObject to serve as the container for the trees
-        GameObject treeContainer = new GameObject("TreeContainer");
+        GameObject treeContainer = new("TreeContainer");
 
         // Generate Poisson disc samples for the forest biome at this specific point
         List<Vector2> treePositions = DiscSampling.GeneratePoints(givenRadius, new Vector2(xSize, zSize), Mathf.FloorToInt(treeDensity * 10)); // Adjust the density
@@ -429,7 +429,7 @@ public class LandscapeGenerator : MonoBehaviour
                             if (bushHeight < 3.5f)
                             {
 
-                                
+
                                 treeHeight = SampleTerrainHeight(position);
                                 bushObject = Instantiate(bushPrefab, new Vector3(position.x, treeHeight, position.y), Quaternion.identity);
 
@@ -445,7 +445,7 @@ public class LandscapeGenerator : MonoBehaviour
 
     private float SampleTerrainHeight(Vector2 position)
     {
-        Vector3 placementPoint = new Vector3(position.x, 0, position.y);
+        Vector3 placementPoint = new(position.x, 0, position.y);
 
         // Trilinear interpolation
         float height = 0f;
@@ -514,7 +514,7 @@ public class LandscapeGenerator : MonoBehaviour
     private List<Vector3> GenerateRiverPath()
     {
         reachedOcean = false;
-        List<Vector3> riverPath = new List<Vector3>();
+        List<Vector3> riverPath = new();
 
         // Find a starting point for the river
         Vector3 startPoint = FindRiverStartPoint();
@@ -671,7 +671,7 @@ public class LandscapeGenerator : MonoBehaviour
             {
                 if (biomeMap[x, z] == biome)
                 {
-                    Vector3 biomePoint = new Vector3(x, SampleTerrainHeight(new Vector2(x, z)), z);
+                    Vector3 biomePoint = new(x, SampleTerrainHeight(new Vector2(x, z)), z);
                     float distance = Vector3.Distance(startPoint, biomePoint);
 
                     if (distance < nearestDistance)
@@ -686,9 +686,9 @@ public class LandscapeGenerator : MonoBehaviour
         return nearestPoint;
     }
 
-    Vector3 AngleConvert(Vector3 direction, float angle)
+    private Vector3 AngleConvert(Vector3 direction, float angle)
     {
-        Vector3 test = new Vector3(1, 0, 0);
+        Vector3 test = new(1, 0, 0);
 
         float a = Mathf.Sqrt(test.x * test.x + test.z + test.z);
         float b = Mathf.Sqrt(direction.x * direction.x + direction.z * direction.z);
@@ -700,7 +700,7 @@ public class LandscapeGenerator : MonoBehaviour
         return direction;
     }
 
-    Vector3 FindNextPoint(Vector3 currentPosition, HashSet<Vector3> visitedPoints, float angle)
+    private Vector3 FindNextPoint(Vector3 currentPosition, HashSet<Vector3> visitedPoints, float angle)
     {
         // Find the nearest ocean biome point to the starting point
         Vector3 endOceanPoint = FindNearestBiomePoint(currentPosition, BiomeType.DeepOcean);
@@ -755,14 +755,14 @@ public class LandscapeGenerator : MonoBehaviour
         return nextPoint;
     }
 
-    float CalculateHeightCost(Vector3 position)
+    private float CalculateHeightCost(Vector3 position)
     {
         return SampleTerrainHeight(position);
     }
 
-    List<Vector3> GetNeighbors(Vector3 position)
+    private List<Vector3> GetNeighbors(Vector3 position)
     {
-        List<Vector3> neighbors = new List<Vector3>();
+        List<Vector3> neighbors = new();
 
         int x = Mathf.FloorToInt(position.x);
         int z = Mathf.FloorToInt(position.z);
@@ -777,7 +777,7 @@ public class LandscapeGenerator : MonoBehaviour
                 // Ensure the neighbor is within bounds
                 if (IsWithinBounds(neighborX, neighborZ))
                 {
-                    Vector3 neighbor = new Vector3(neighborX, 0, neighborZ);
+                    Vector3 neighbor = new(neighborX, 0, neighborZ);
                     // Skip the current position itself
                     if (neighbor != position)
                     {
@@ -897,7 +897,8 @@ public class LandscapeGenerator : MonoBehaviour
 
         mesh.colors = colors;
     }
-    bool IsWithinBounds(int x, int z)
+
+    private bool IsWithinBounds(int x, int z)
     {
         return x >= 0 && x <= xSize && z >= 0 && z <= zSize;
     }
@@ -931,34 +932,19 @@ public class LandscapeGenerator : MonoBehaviour
         {
             for (int z = 0; z <= zSize; z++)
             {
-                Vector3 position = new Vector3(x, 0f, z);
+                Vector3 position = new(x, 0f, z);
                 BiomeType biome = biomeMap[x, z];
 
-                switch (biome)
+                Gizmos.color = biome switch
                 {
-                    case BiomeType.Plains:
-                        Gizmos.color = Color.green;
-                        break;
-                    case BiomeType.Forest:
-                        Gizmos.color = Color.red;
-                        break;
-                    case BiomeType.Mountains:
-                        Gizmos.color = Color.gray;
-                        break;
-                    case BiomeType.DeepOcean:
-                        Gizmos.color = Color.blue;
-                        break;
-                    case BiomeType.Beach:
-                        Gizmos.color = Color.yellow;
-                        break;
-                    case BiomeType.River:
-                        Gizmos.color = Color.cyan;
-                        break;
-                    default:
-                        Gizmos.color = Color.white;
-                        break;
-                }
-
+                    BiomeType.Plains => Color.green,
+                    BiomeType.Forest => Color.red,
+                    BiomeType.Mountains => Color.gray,
+                    BiomeType.DeepOcean => Color.blue,
+                    BiomeType.Beach => Color.yellow,
+                    BiomeType.River => Color.cyan,
+                    _ => Color.white,
+                };
                 Gizmos.DrawSphere(position, sphereSize);
             }
         }
